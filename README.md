@@ -1,8 +1,5 @@
 # Limited TNiC Bot
 
-> [!WARNING]  
-> This repository is archived and won't c
-
 Limited TNiC is a full rewrite of nEXT bot with saving functionality. TNiC stands for "The nEXT is on C". TNiC is fully compatible with Limited nEXT PostgreSQL DB, so you don't want to replace it.
 
 ## About
