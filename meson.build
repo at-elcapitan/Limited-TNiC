@@ -1,9 +1,8 @@
 project('Limited TNiC', 'c')
 
-# Define the executable
-executable(
+exec = executable(
   'tnic',
   ['src/main.c'],
   c_args: [],
-  link_args: []
+  link_args: [ '-lcoglink', '-pthread', '-ldiscord', '-lcurl' ]
 )
