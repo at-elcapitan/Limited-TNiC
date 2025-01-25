@@ -4,6 +4,7 @@
 #include <concord/discord.h>
 #include <coglink/lavalink.h>
 
+#include "rustvibes.h"
 #include "struct.h"
 #include "error.h"
 #include "music.h"
@@ -34,6 +35,7 @@ void applicationClean(tnic_application app) {
     discord_cleanup(app.bot);
     coglink_cleanup(app.client);
     ccord_global_cleanup();
+    free(app.config);
 }
 
 void botPrepear(struct discord *bot) {
@@ -47,10 +49,26 @@ void botPrepear(struct discord *bot) {
     discord_set_on_interaction_create(bot, &tnic_onInteraction);
 }
 
+/**
+ * @brief Load application configuration from a file
+ * @return Function returns tnic_errnoReturn struct.
+ * @retval If errno is not tnic_OK, data field won't contain information (NULL).
+ * @retval If errno is tnic_OK, data will contain void* to tnic_applicationConfig type.
+ */
+tnic_errnoReturn loadApplicationConfig() {
+    tnic_errnoReturn err;
+    
+    tnic_todo();
+
+    err.data = NULL;
+    err.errno = tnic_OK;
+    return err;
+}
+
 int main(void) {
     struct coglink_client *client;
     struct discord *bot;
-    u64snowflake botId = 1265446831660466297;
+    u64snowflake botId;
 
     puts("AT PROJECT Limited, 2021 - 2025; ATNiC-v0.0.1a");
     puts("Product licensed by GPLv3, file `LICENSE`");
@@ -95,7 +113,14 @@ int main(void) {
         .on_ready = &on_coglink_ready
     };
 
-    app.client->bot_id = botId;
+    tnic_errnoReturn loadErrno = loadApplicationConfig();
+    if (loadErrno.errno != tnic_OK) {
+        log_fatal("Unable to load app config");
+        applicationClean(app);
+        return -1;
+    }
+
+    app.config = (tnic_applicationConfig*)loadErrno.data;
     app.client->num_shards = "1";
 
     int nodesState = coglink_connect_nodes(app.client, app.bot, &nodes);

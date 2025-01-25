@@ -2,8 +2,7 @@
 #define __TNIC_ERROR_H
 
 enum tnic_errorTypes {
-    Ok,
-    tnic_coglink_errorConnectNodes
+    tnic_OK
 };
 
 typedef struct {

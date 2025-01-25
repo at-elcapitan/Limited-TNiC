@@ -6,9 +6,14 @@
 #include <stdbool.h>
 
 typedef struct {
+    u64snowflake botId;
+} tnic_applicationConfig;
+
+typedef struct {
     bool botReady;
     struct discord *bot;
     struct coglink_client *client;
+    tnic_applicationConfig *config;
 } tnic_application;
 
 #endif
