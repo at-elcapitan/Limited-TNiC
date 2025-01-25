@@ -58,7 +58,7 @@ void botPrepear(struct discord *bot) {
 tnic_errnoReturn loadApplicationConfig() {
     tnic_errnoReturn err;
     
-    tnic_todo();
+    macro_todo();
 
     err.data = NULL;
     err.errno = tnic_OK;
