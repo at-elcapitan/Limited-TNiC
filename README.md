@@ -6,7 +6,7 @@ Limited TNiC is a full rewrite of nEXT bot with saving functionality. TNiC stand
 
 > [!WARNING]  
 > ### TNiC pre-alpha
-> This version is pre-alpha, so this bot only has a small part of nEXT functionality.
+> Bot is in the pre-alpha, so it has a small part of nEXT functionality.
 
 ## About
 
