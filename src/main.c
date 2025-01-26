@@ -4,11 +4,11 @@
 #include <concord/discord.h>
 #include <coglink/lavalink.h>
 
-#include "rustvibes.h"
-#include "struct.h"
 #include "error.h"
 #include "music.h"
 #include "embeds.h"
+#include "struct.h"
+#include "rustvibes.h"
 
 tnic_application app = {
     .bot = NULL,
