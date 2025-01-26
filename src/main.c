@@ -7,7 +7,7 @@
 #include "error.h"
 #include "music.h"
 #include "embeds.h"
-#include "struct.h"
+#include "application.h"
 #include "rustvibes.h"
 
 tnic_application app = {
@@ -49,6 +49,8 @@ void on_ready(struct discord *bot, const struct discord_ready *event) {
         discord_update_presence(bot, &status);
     }
 
+    tnic_registerMusicCommands(bot, event);
+
     struct discord_create_global_application_command params = {
         .name = "ping",
         .description = "Ping command!"
@@ -59,7 +61,7 @@ void on_ready(struct discord *bot, const struct discord_ready *event) {
 
 void on_interaction(struct discord *bot, const struct discord_interaction *event) {
     if (!app.botReady) {
-        struct discord_embed embed = tnic_errorEmbed("#e001 coglink_not_ready", "Application not ready. Waiting for nodes to connect");
+        struct discord_embed embed = tnic_errorEmbed("#e001x1 coglink_not_ready", "Application not ready. Waiting for nodes to connect");
         struct discord_interaction_response params = {
             .type = DISCORD_INTERACTION_CHANNEL_MESSAGE_WITH_SOURCE,
             .data = &(struct discord_interaction_callback_data) {
@@ -76,13 +78,14 @@ void on_interaction(struct discord *bot, const struct discord_interaction *event
     }
 
     if (event->type == DISCORD_INTERACTION_APPLICATION_COMMAND) {
-        proccessApplicationCommand(bot, event);
+        tnic_proccessApplicationCommand(app, event);
         return;
     }
 }
 
 void applicationClean(tnic_application app) {
     discord_cleanup(app.bot);
+    ccord_shutdown_async();
 
     if (!app.coglinkReady) {
         free(app.client);
@@ -101,6 +104,12 @@ void applicationClean(tnic_application app) {
     }
 
     free(app.config);
+}
+
+void on_sigint_sigabt(int signal) {
+    log_info("[TNiC] Catched signal %d, cleaning application", signal);
+    applicationClean(app);
+    exit(0);
 }
 
 void botPrepear(struct discord *bot) {
@@ -152,6 +161,7 @@ enum tnic_errorTypes loadApplicationConfig(tnic_application app) {
 }
 
 int main(void) {
+    signal(SIGINT, &on_sigint_sigabt);
     struct coglink_client *client;
     struct discord *bot;
 
@@ -204,16 +214,14 @@ int main(void) {
         .size = 1
     };
 
+    app.client->bot_id = app.config->botId;
     app.client->events = &(struct coglink_events){
         .on_ready = &on_coglink_ready
     };
     app.client->num_shards = "1";
 
     // Connecting nodes
-    int nodesState = coglink_connect_nodes(app.client, app.bot, &nodes);
-
-    // Checking wether nodes are connected
-    if (nodesState == COGLINK_FAILED) {
+    if (coglink_connect_nodes(app.client, app.bot, &nodes) == COGLINK_FAILED) {
         log_fatal("[COGLINK] Can't connect nodes");
         applicationClean(app);
         return -1;
@@ -223,7 +231,6 @@ int main(void) {
 
     // Running the application
     discord_run(app.bot);
-
     applicationClean(app);
     return 0;
 }
