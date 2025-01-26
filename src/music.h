@@ -5,6 +5,6 @@
 #include <concord/discord.h>
 #include <coglink/lavalink.h>
 
-void tnic_onInteraction(struct discord *bot, const struct discord_interaction *event);
+void proccessApplicationCommand(struct discord *bot, const struct discord_interaction *event);
 
 #endif

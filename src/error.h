@@ -2,7 +2,8 @@
 #define __TNIC_ERROR_H
 
 enum tnic_errorTypes {
-    tnic_OK
+    tnic_OK,
+    tnic_VALUE_NOT_FOUND
 };
 
 typedef struct {

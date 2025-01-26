@@ -18,10 +18,3 @@ void proccessApplicationCommand(struct discord *bot, const struct discord_intera
         return;
     }
 }
-
-void tnic_onInteraction(struct discord *bot, const struct discord_interaction *event) {
-    if (event->type == DISCORD_INTERACTION_APPLICATION_COMMAND) {
-        proccessApplicationCommand(bot, event);
-        return;
-    }
-}
