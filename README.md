@@ -1,6 +1,12 @@
+![Static Badge](https://img.shields.io/badge/Language-C-lightgrey) ![Static Badge](https://img.shields.io/badge/Library-Concord-purple)
+
 # Limited TNiC Bot
 
 Limited TNiC is a full rewrite of nEXT bot with saving functionality. TNiC stands for "The nEXT is C". TNiC is fully compatible with Limited nEXT PostgreSQL DB, so you don't want to replace it.
+
+> [!WARNING]  
+> ### TNiC pre-alpha
+> This version is pre-alpha, so this bot only has a small part of nEXT functionality.
 
 ## About
 
