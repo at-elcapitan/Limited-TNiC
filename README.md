@@ -1,4 +1,4 @@
-![Static Badge](https://img.shields.io/badge/Language-C-lightgrey) ![Static Badge](https://img.shields.io/badge/Library-Concord-purple)
+![Static Badge](https://img.shields.io/badge/Language-C-lightgrey) ![Static Badge](https://img.shields.io/badge/Library-Concord-purple) ![Static Badge](https://img.shields.io/badge/Library-CogLink-purple)
 
 # Limited TNiC Bot
 
@@ -21,6 +21,8 @@ The bot is designed to provide a seamless music streaming experience on Discord,
 ## Bot Setup and Usage
 
 ### Dependencies
+- [Concord](https://github.com/Cogmasters/concord)
+- [CogLink](https://github.com/PerformanC/CogLink)
 
 #### Installing build dependencies
 
