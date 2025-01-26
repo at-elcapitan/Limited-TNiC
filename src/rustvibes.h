@@ -14,11 +14,13 @@
 enum tnic_errorTypes {
     tnic_OK,
     tnic_VALUE_NOT_FOUND,
-    tnic_IS_NULL
+    tnic_IS_NULL,
+    tnic_SEARCH_FAILED
 };
 
 typedef struct {
     enum tnic_errorTypes Err;
+    int additionalNumber;
     void *Ok;
 } tnic_errnoReturn;
 

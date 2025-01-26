@@ -3,6 +3,9 @@
 
 #include <concord/discord.h>
 
-struct discord_embed tnic_errorEmbed(char *errstring, char *message);
+#include "application.h"
+
+void tnic_sendErrorEmbed(tnic_application app, const struct discord_interaction *event, 
+                               char *errstring, char *message);
 
 #endif

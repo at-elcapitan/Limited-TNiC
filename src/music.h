@@ -8,6 +8,7 @@
 
 #include "application.h"
 #include "rustvibes.h"
+#include "playlist.h"
 #include "embeds.h"
 
 void tnic_proccessApplicationCommand(tnic_application app, const struct discord_interaction *event);

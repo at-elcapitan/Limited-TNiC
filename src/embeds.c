@@ -10,7 +10,8 @@
  *
  * @note Embed must NOT be cleaned by discord_embed_cleanup()
  */
-struct discord_embed tnic_errorEmbed(char *errstring, char *message) {
+void tnic_sendErrorEmbed(tnic_application app, const struct discord_interaction *event, 
+                               char *errstring, char *message) {
     struct discord_embed_footer footer = {
         .text = errstring,
         .icon_url = NULL,
@@ -22,6 +23,17 @@ struct discord_embed tnic_errorEmbed(char *errstring, char *message) {
         .title = message,
         .footer = &footer
     };
-    
-    return embed;
+
+    struct discord_interaction_response params = {
+        .type = DISCORD_INTERACTION_CHANNEL_MESSAGE_WITH_SOURCE,
+        .data = &(struct discord_interaction_callback_data) {
+            .embeds = &(struct discord_embeds){
+                .size = 1,
+                .array = &embed,
+            },
+            .flags = DISCORD_MESSAGE_EPHEMERAL
+        }
+    };
+
+    discord_create_interaction_response(app.bot, event->id, event->token, &params, NULL);
 }

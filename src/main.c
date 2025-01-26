@@ -50,30 +50,11 @@ void on_ready(struct discord *bot, const struct discord_ready *event) {
     }
 
     tnic_registerMusicCommands(bot, event);
-
-    struct discord_create_global_application_command params = {
-        .name = "ping",
-        .description = "Ping command!"
-    };
-
-    discord_create_global_application_command(bot, event->application->id, &params, NULL);
 }
 
 void on_interaction(struct discord *bot, const struct discord_interaction *event) {
     if (!app.botReady) {
-        struct discord_embed embed = tnic_errorEmbed("#e001x1 coglink_not_ready", "Application not ready. Waiting for nodes to connect");
-        struct discord_interaction_response params = {
-            .type = DISCORD_INTERACTION_CHANNEL_MESSAGE_WITH_SOURCE,
-            .data = &(struct discord_interaction_callback_data) {
-                .embeds = &(struct discord_embeds){
-                    .size = 1,
-                    .array = &embed,
-                },
-                .flags = DISCORD_MESSAGE_EPHEMERAL
-            }
-        };
-
-        discord_create_interaction_response(bot, event->id, event->token, &params, NULL);
+        tnic_sendErrorEmbed(app, event, "#e001x1 coglink_not_ready", "Application not ready. Waiting for nodes to connect");
         return;
     }
 
@@ -165,7 +146,7 @@ int main(void) {
     struct coglink_client *client;
     struct discord *bot;
 
-    puts("AT PROJECT Limited, 2021 - 2025; ATNiC-v0.0.1a");
+    puts("AT PROJECT Limited, 2021 - 2025; ATNiC-270120250817JST");
     puts("Product licensed by GPLv3, file `LICENSE`");
     puts("This is a prototype version and should not be used in production environments");
     puts("by Vladislav 'ElCapitan' Nazarov");
