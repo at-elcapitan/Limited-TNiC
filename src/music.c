@@ -78,7 +78,6 @@ void commandTestConnect(tnic_application app, const struct discord_interaction *
             .encoded =search_response->array[0]->encoded,
         },
     };
-    printf("%d", response.type);
     
     coglink_update_player(app.client, player, &params, NULL);
     coglink_free_load_tracks(&response);
