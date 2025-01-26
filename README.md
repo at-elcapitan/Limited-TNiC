@@ -10,12 +10,93 @@ Limited nEXT is one of the bots in the 'Limited' series, which includes:
 - [Limited C/Link](https://github.com/at-elcapitan/Limited-C_Link)
 - [Limited jEXT](https://github.com/at-elcapitan/AT-Limited_jEXT)
 
-The bot is designed to provide a seamless music streaming experience on Discord, and it is equipped with features that make it stand out.
+The bot is designed to provide a seamless music streaming experience on Discord, equipped with features that make it stand out.
 
 ## Bot Setup and Usage
 
+### Dependencies
+
+#### Installing build dependencies
+
+Debian GNU/Linux
+```bash
+sudo apt install meson gcc gcc-multilib libcurl4-openssl-dev git
+```
+
+Arch Linux
+```bash
+sudo pacman -Sy meson gcc git curl
+```
+
+#### Installing Concord
+
+Debian GNU/Linux
+```bash
+git clone https://github.com/cogmasters/concord.git && cd concord && make && sudo make install
+```
+
+Arch Linux
+```bash
+git clone https://aur.archlinux.org/concord-git.git
+cd concord-git
+makepkg -Acs
+pacman -U concord-git-version-any.pkg.tar.zst
+```
+or
+```bash
+yay -S concord-git
+```
+
+#### Installing CogLink
+
+```bash
+git clone https://github.com/PerformanC/CogLink && cd CogLink && make && sudo make install
+```
+
+### Building bot
+
+```bash
+meson build --buildtype debug && cd build && ninja
+```
+
 ### Configuring
+
+Create config.json in `build` folder (or any another folder with bot's executable)
+
+```
+{
+  "logging": { // logging directives
+    "level": "trace",        // trace, debug, info, warn, error, fatal
+    "filename": "bot.log",   // the log output file
+    "quiet": false,          // change to true to disable logs in console
+    "overwrite": true,       // overwrite file if already exists, append otherwise
+    "use_color": true,       // display color for log entries
+    "http": {
+      "enable": true,        // generate http specific logging
+      "filename": "http.log" // the HTTP log output file
+    },
+    "disable_modules": ["WEBSOCKETS", "USER_AGENT"] // disable logging for these modules
+  },
+  "discord": { // discord directives
+    "token": "YOUR-BOT-TOKEN",         // replace with your bot token
+    "default_prefix": {                 
+      "enable": false,                 // enable default command prefix
+      "prefix": "YOUR-COMMANDS-PREFIX" // replace with your prefix
+    }
+  },
+  "bot_id" : 1234567,              // Replace with your bot ID
+  "game_name" : "Your game",       // Not required. Setup if you want your bot to play some game
+  "status" : "online"              // Required if game_name is defined
+} 
+```
 
 ## Commands
 
+| Command Name      | Description                                        |
+| ----------------- | -------------------------------------------------- |
+| /youtube          | Play a YouTube track                               |
+| /disconnect       | Disconnect bot from voice channel                  |
+
 ## Using external PostgreSQL Database
+
+> Database connection not implemented
