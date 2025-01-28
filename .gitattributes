@@ -1,0 +1,3 @@
+# Setting up external lib's files for not appliying for repo statistics
+src/map/map.c linguist-generated=true
+src/map/map.h linguist-generated=true

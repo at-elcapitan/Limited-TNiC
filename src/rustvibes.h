@@ -15,7 +15,10 @@ enum tnic_errorTypes {
     tnic_OK,
     tnic_VALUE_NOT_FOUND,
     tnic_IS_NULL,
-    tnic_SEARCH_FAILED
+    tnic_SEARCH_FAILED,
+    tnic_FAILED,
+    tnic_OUT_OF_RANGE,
+    tnic_PLAYLIST_END
 };
 
 typedef struct {

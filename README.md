@@ -27,6 +27,7 @@ The bot is designed to provide a seamless music streaming experience on Discord,
 ### Dependencies
 - [Concord](https://github.com/Cogmasters/concord)
 - [CogLink](https://github.com/PerformanC/CogLink)
+- [rxi/map](https://github.com/rxi/map)
 
 #### Installing build dependencies
 

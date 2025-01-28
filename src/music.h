@@ -13,5 +13,6 @@
 
 void tnic_proccessApplicationCommand(tnic_application app, const struct discord_interaction *event);
 void tnic_registerMusicCommands(struct discord *bot, const struct discord_ready *event);
+void tnic_cmusicProcessEvent(tnic_application app, struct coglink_client *c_client, struct coglink_node *node, struct coglink_track_end *trackEnd);
 
 #endif

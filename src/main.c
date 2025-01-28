@@ -19,7 +19,8 @@ tnic_application app = {
 };
 
 // Events
-void on_coglink_ready(struct coglink_client *client, struct coglink_node *node, struct coglink_ready *ready) {
+void on_coglink_ready(struct coglink_client *client, struct coglink_node *node, 
+                      struct coglink_ready *ready) {
     log_info("[COGLINK] Node connected [%s]", ready->session_id);
     app.botReady = true;
 }
@@ -53,15 +54,21 @@ void on_ready(struct discord *bot, const struct discord_ready *event) {
 }
 
 void on_interaction(struct discord *bot, const struct discord_interaction *event) {
-    if (!app.botReady) {
-        tnic_sendErrorEmbed(app, event, "#e001x1 coglink_not_ready", "Application not ready. Waiting for nodes to connect");
+    /* if (!app.botReady) {
+        tnic_sendErrorEmbed(app, event, "#e001x1 coglink_not_ready", 
+                            "Application not ready. Waiting for nodes to connect");
         return;
     }
-
+ */
     if (event->type == DISCORD_INTERACTION_APPLICATION_COMMAND) {
         tnic_proccessApplicationCommand(app, event);
         return;
     }
+}
+
+void on_coglink_track_end(struct coglink_client *c_client, struct coglink_node *node, 
+                          struct coglink_track_end *trackEnd) {
+    tnic_cmusicProcessEvent(app, c_client, node, trackEnd);
 }
 
 void applicationClean(tnic_application app) {
@@ -84,6 +91,12 @@ void applicationClean(tnic_application app) {
         free(app.config->botGameName);
     }
 
+    if (app.playlistController->playlist != NULL) {
+        playlist_clearPlaylist(app.playlistController->playlist);
+        free(app.playlistController->playlist);
+    }
+
+    free(app.playlistController);
     free(app.config);
 }
 
@@ -98,6 +111,9 @@ void botPrepear(struct discord *bot) {
     discord_add_intents(bot, DISCORD_GATEWAY_GUILD_VOICE_STATES);
     discord_add_intents(bot, DISCORD_GATEWAY_MESSAGE_CONTENT);
     discord_add_intents(bot, DISCORD_GATEWAY_GUILDS);
+
+    // Setting global
+    discord_set_data(bot, &app);
 
     // Adding application commands
     discord_set_on_ready(bot, &on_ready);
@@ -146,7 +162,7 @@ int main(void) {
     struct coglink_client *client;
     struct discord *bot;
 
-    puts("AT PROJECT Limited, 2021 - 2025; ATNiC-270120250817JST");
+    puts("AT PROJECT Limited, 2021 - 2025; ATNiC-290120250759JST");
     puts("Product licensed by GPLv3, file `LICENSE`");
     puts("This is a prototype version and should not be used in production environments");
     puts("by Vladislav 'ElCapitan' Nazarov");
@@ -159,6 +175,8 @@ int main(void) {
     app.bot = bot;
     app.client = client;
     app.config = (tnic_applicationConfig*)malloc(sizeof(tnic_applicationConfig));
+    app.playlistController = (tnic_playlist_controller*)malloc(sizeof(tnic_playlist_controller));
+    app.playlistController->playlist = NULL;
 
     // Checking wether variables was initialized
     if (bot == NULL) {
@@ -170,6 +188,18 @@ int main(void) {
 
     if (client == NULL) {
         log_fatal("[TNiC] Coglink initialization failed");
+        applicationClean(app);
+        return -1;
+    }
+
+    if (app.config == NULL) {
+        log_fatal("[TNiC] Config initialization failed");
+        applicationClean(app);
+        return -1;
+    }
+
+    if (app.playlistController == NULL) {
+        log_fatal("[TNiC] Playlist controller initialization failed");
         applicationClean(app);
         return -1;
     }
@@ -200,6 +230,12 @@ int main(void) {
         .on_ready = &on_coglink_ready
     };
     app.client->num_shards = "1";
+
+    // Connecting events
+    struct coglink_events events = {
+        .on_track_end = &on_coglink_track_end
+    };
+    app.client->events = &events;
 
     // Connecting nodes
     if (coglink_connect_nodes(app.client, app.bot, &nodes) == COGLINK_FAILED) {

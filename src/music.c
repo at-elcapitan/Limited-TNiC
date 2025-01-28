@@ -29,6 +29,7 @@ tnic_errnoReturn getTrackFromQuery(const char *query, struct coglink_client *cli
     if (!curl) {
         return (tnic_errnoReturn) {
             .Err = tnic_IS_NULL,
+
             .additionalNumber = 1,
             .Ok = NULL
         };
@@ -57,9 +58,9 @@ tnic_errnoReturn getTrackFromQuery(const char *query, struct coglink_client *cli
 
     snprintf(searchQuery, strlen(search) + sizeof("ytsearch:") + 1, "ytsearch:%s", search);
 
-    struct coglink_load_tracks response = { 0 };
+    struct coglink_load_tracks *response = (struct coglink_load_tracks*)malloc(sizeof(struct coglink_load_tracks *));
 
-    int status = coglink_load_tracks(client, coglink_get_player_node(client, player), searchQuery, &response);
+    int status = coglink_load_tracks(client, coglink_get_player_node(client, player), searchQuery, response);
 
     curl_free(search);
     curl_easy_cleanup(curl);
@@ -73,31 +74,33 @@ tnic_errnoReturn getTrackFromQuery(const char *query, struct coglink_client *cli
         };
     }
 
-    tnic_track track;
-    track.response = &response;
+    tnic_track *track = malloc(sizeof(tnic_track));
+    track->response = response;
 
-    switch (response.type) {
+    switch (response->type) {
         case COGLINK_LOAD_TYPE_TRACK:
-            struct coglink_load_tracks_track *trackResponse = response.data;
-            track.encodedTrack = trackResponse->encoded;
-            track.trackInfo = trackResponse->info;
+            struct coglink_load_tracks_track *trackResponse = response->data;
+            track->encodedTrack = trackResponse->encoded;
+            track->trackInfo = trackResponse->info;
             break;
         
         case COGLINK_LOAD_TYPE_PLAYLIST:
-            struct coglink_load_tracks_playlist *data = response.data;
-            track.encodedTrack = data->tracks->array[0]->encoded;
-            track.trackInfo = data->tracks->array[0]->info;
+            struct coglink_load_tracks_playlist *data = response->data;
+            track->encodedTrack = data->tracks->array[0]->encoded;
+            track->trackInfo = data->tracks->array[0]->info;
             break;
 
         case COGLINK_LOAD_TYPE_SEARCH:
-            struct coglink_load_tracks_search *searchResponse = response.data;
-            track.encodedTrack = searchResponse->array[0]->encoded;
-            track.trackInfo = searchResponse->array[0]->info;
+            struct coglink_load_tracks_search *searchResponse = response->data;
+            track->encodedTrack = searchResponse->array[0]->encoded;
+            track->trackInfo = searchResponse->array[0]->info;
             break;
         
         case COGLINK_LOAD_TYPE_EMPTY:        
         case COGLINK_LOAD_TYPE_ERROR:
-            coglink_free_load_tracks(&response);
+            coglink_free_load_tracks(response);
+            free(response);
+
             return (tnic_errnoReturn) {
                 .Err = tnic_SEARCH_FAILED,
                 .additionalNumber = 0,
@@ -108,8 +111,18 @@ tnic_errnoReturn getTrackFromQuery(const char *query, struct coglink_client *cli
     return (tnic_errnoReturn) {
         .Err = tnic_OK,
         .additionalNumber = 0,
-        .Ok = &track
+        .Ok = track
     };
+}
+
+void playTrack(tnic_application app, struct coglink_player *player, tnic_track *track) {
+    struct coglink_update_player_params params = {
+        .track = &(struct coglink_update_player_track_params) {
+            .encoded = track->encodedTrack
+        }
+    };
+
+    coglink_update_player(app.client, player, &params, NULL);
 }
 
 void youtube(tnic_application app, const struct discord_interaction *event) {
@@ -154,15 +167,14 @@ void youtube(tnic_application app, const struct discord_interaction *event) {
     }
 
     tnic_track *track = (tnic_track*)getTrackErrno.Ok;
-    
-    struct coglink_update_player_params params = {
-        .track = &(struct coglink_update_player_track_params) {
-            .encoded = track->encodedTrack
-        }
-    };
 
-    coglink_update_player(app.client, player, &params, NULL);
-    coglink_free_load_tracks(track->response);
+    if (app.playlistController->playlist == NULL) {
+        app.playlistController->playlist = playlist_init(track);
+        playTrack(app, player, track);
+    } else if (playlist_addTrack(app.playlistController->playlist, track)) {
+        log_debug("Playing");
+        playTrack(app, player, track);
+    }
 
     struct discord_interaction_response interactionRespParams = {
         .type = DISCORD_INTERACTION_CHANNEL_MESSAGE_WITH_SOURCE,
@@ -187,6 +199,9 @@ void commandTestDisconnect(tnic_application app, const struct discord_interactio
     coglink_destroy_player(app.client, player);
     coglink_remove_player(app.client, player);
     coglink_leave_voice_channel(app.client, app.bot, event->guild_id);
+    playlist_clearPlaylist(app.playlistController->playlist);
+    free(app.playlistController->playlist);
+    app.playlistController->playlist = NULL;
 
     struct discord_interaction_response interactionRespParams = {
         .type = DISCORD_INTERACTION_CHANNEL_MESSAGE_WITH_SOURCE,
@@ -236,4 +251,29 @@ void tnic_registerMusicCommands(struct discord *bot, const struct discord_ready 
 
     discord_create_global_application_command(bot, event->application->id, &youtubeCommand, NULL);
     discord_create_global_application_command(bot, event->application->id, &commandTestDisconnect, NULL);
+}
+
+// Events
+macro_testCommand()
+void tnic_cmusicProcessEvent(tnic_application app, struct coglink_client *c_client, struct coglink_node *node, 
+                          struct coglink_track_end *trackEnd) {
+    // code
+    if (trackEnd->reason == COGLINK_TRACK_END_REASON_FINISHED) {
+        tnic_errnoReturn errno = playlist_changeTrack(app.playlistController->playlist, false, false);
+
+        if (errno.Err != tnic_OK)
+            return;
+
+        
+
+        tnic_track *track = (tnic_track*)errno.Ok;
+
+        struct coglink_update_player_params params = {
+            .track = &(struct coglink_update_player_track_params) {
+                .encoded = track->encodedTrack
+            }
+        };
+
+        coglink_update_player(app.client, coglink_get_player(app.client, trackEnd->guildId), &params, NULL);
+    }
 }
