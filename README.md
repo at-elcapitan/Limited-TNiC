@@ -99,7 +99,8 @@ Create config.json in `build` folder (or any another folder with bot's executabl
   },
   "bot_id" : 1234567,              // Replace with your bot ID
   "game_name" : "Your game",       // Not required. Setup if you want your bot to play some game
-  "status" : "online"              // Required if game_name is defined
+  "status" : "online",             // Required if game_name is defined
+  "admin_debug_id" : 1234567       // Not required for work. Replace with your ID to allow commands only for your user
 } 
 ```
 
