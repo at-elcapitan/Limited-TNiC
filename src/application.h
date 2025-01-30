@@ -11,6 +11,9 @@ typedef struct {
     u64snowflake botId;
     char *botGameName;
     char *botStatus;
+#ifdef DEBUG
+    u64snowflake allowedBotAdmin;
+#endif
 } tnic_applicationConfig;
 
 typedef struct {

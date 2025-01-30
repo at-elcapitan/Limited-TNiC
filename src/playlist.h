@@ -37,8 +37,7 @@ typedef struct {
 } tnic_playlist_controller;
 
 void playlist_clearPlaylist(tnic_playlist *playlist);
-// tnic_errnoReturn playlist_addTrack(tnic_playlist *playlist, tnic_track *track);
-bool playlist_addTrack(tnic_playlist *playlist, tnic_track *track);
+tnic_errnoReturn playlist_addTrack(tnic_playlist *playlist, tnic_track *track);
 tnic_errnoReturn playlist_getTrack(tnic_playlist *playlist, const uint32_t position);
 tnic_errnoReturn playlist_changeTrack(tnic_playlist *playlist, const bool reverse, bool force);
 tnic_playlist* playlist_init(tnic_track *track);

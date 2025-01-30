@@ -11,7 +11,7 @@
  * @note Embed must NOT be cleaned by discord_embed_cleanup()
  */
 void tnic_sendErrorEmbed(tnic_application app, const struct discord_interaction *event, 
-                               char *errstring, char *message) {
+                         char *errstring, char *message) {
     struct discord_embed_footer footer = {
         .text = errstring,
         .icon_url = NULL,

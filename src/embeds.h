@@ -6,6 +6,6 @@
 #include "application.h"
 
 void tnic_sendErrorEmbed(tnic_application app, const struct discord_interaction *event, 
-                               char *errstring, char *message);
+                         char *errstring, char *message);
 
 #endif

@@ -1,13 +1,16 @@
 #include "playlist.h"
 
-macro_testCommand()
-// Make check if malloc fails
-bool playlist_addTrack(tnic_playlist *playlist, tnic_track *track) {
+/*
+ * @return Returns errnoReturn struct. Value is stored in .additionalNumber
+ * if 1 - you need to play loaded track, if 0 - you don't need it
+*/
+tnic_errnoReturn playlist_addTrack(tnic_playlist *playlist, tnic_track *track) {
     tnic_track **newTracksArr = (tnic_track**) malloc(sizeof(tnic_track*) * (playlist->size + 1));
 
-    /* if (!newTracksArr) {
+    if (!newTracksArr) {
+        log_debug("[TNIC/Errno] Errno: tnic_IS_NULL, position: %d, at %s", __LINE__, __FILE__);
         return (tnic_errnoReturn) { .Err = tnic_IS_NULL, .Ok = NULL };
-    } */
+    }
 
     if (playlist->size == 0) {
         newTracksArr[0] = track;
@@ -16,9 +19,8 @@ bool playlist_addTrack(tnic_playlist *playlist, tnic_track *track) {
         playlist->isPaused = false;
         playlist->position = 0;
         playlist->size = 1;
-        
-        //return (tnic_errnoReturn) { .Err = tnic_OK, .Ok = (void *)(uintptr_t)true };
-        return true;
+
+        return (tnic_errnoReturn) { .Err = tnic_OK, .additionalNumber = 1 };
     }
 
     for (size_t i = 0; i < playlist->size; i++) {
@@ -29,8 +31,8 @@ bool playlist_addTrack(tnic_playlist *playlist, tnic_track *track) {
 
     playlist->size += 1;
     playlist->tracks[playlist->size - 1] = track;
-    // return (tnic_errnoReturn) { .Err = tnic_OK, .Ok = (void *)(uintptr_t)false };
-    return false;
+
+    return (tnic_errnoReturn) { .Err = tnic_OK, .additionalNumber = 0 };
 }
 
 void playlist_changeState(tnic_playlist *playlist, const enum tnic_playlistStates state) {
@@ -67,6 +69,11 @@ tnic_errnoReturn playlist_getTrack(tnic_playlist *playlist, const uint32_t posit
     return errno;
 }
 
+/*
+ * @return Errno - tnic_OK, tnic_PLAYLIST_END
+ * @return .additionalNumber - always empty value
+ * @return .Ok - always NULL
+*/
 tnic_errnoReturn playlist_changeTrack(tnic_playlist *playlist, const bool reverse, bool force) {
     enum tnic_playlistStates localStateCopy = playlist->currentState;
 
@@ -86,6 +93,7 @@ tnic_errnoReturn playlist_changeTrack(tnic_playlist *playlist, const bool revers
         playlist->position = 0;                                        // and state is set to LOOP_PLAYLIST
     } else {
         if (playlist->position + 1 == playlist->size) {                // If we are at the end of the playlist
+            log_debug("[TNIC/Errno] Errno: tnic_PLAYLIST_END, position: %d, at %s", __LINE__, __FILE__);
             playlist_clearPlaylist(playlist);
             return (tnic_errnoReturn) { .Err = tnic_PLAYLIST_END, .Ok = NULL };
         }

@@ -14,10 +14,10 @@
  * @param query The search query for the track.
  * @param client The Coglink client used for track retrieval.
  * 
- * Error states:
- * - 1: Curl process error
- * - 2: Curl esacape processing error
- * - 3: Error while allocation memory
+ * .additionalNumber used for error details
+ * - 1: Curl process error tnic_IS_NULL
+ * - 2: Curl esacape processing error tnic_IS_NULL
+ * - 3: Error while allocation memory tnic_IS_NULL
  *
  * @return struct tnic_errnoReturn
  *
@@ -27,6 +27,7 @@ tnic_errnoReturn getTrackFromQuery(const char *query, struct coglink_client *cli
                                    struct coglink_player *player) {
     CURL *curl = curl_easy_init();
     if (!curl) {
+        log_debug("[TNIC/Errno] Errno: tnic_IS_NULL 1, position: %d, at %s", __LINE__, __FILE__);
         return (tnic_errnoReturn) {
             .Err = tnic_IS_NULL,
 
@@ -37,6 +38,7 @@ tnic_errnoReturn getTrackFromQuery(const char *query, struct coglink_client *cli
 
     char *search = curl_easy_escape(curl, query, strlen(query));
     if (!search) {
+        log_debug("[TNIC/Errno] Errno: tnic_IS_NULL 3, position: %d, at %s", __LINE__, __FILE__);
         curl_easy_cleanup(curl);
         return (tnic_errnoReturn) {
             .Err = tnic_IS_NULL,
@@ -47,6 +49,7 @@ tnic_errnoReturn getTrackFromQuery(const char *query, struct coglink_client *cli
 
     char *searchQuery = malloc(strlen(search) + sizeof("ytsearch:") + 1);
     if (!searchQuery) {
+        log_debug("[TNIC/Errno] Errno: tnic_IS_NULL 2, position: %d, at %s", __LINE__, __FILE__);
         curl_free(search);
         curl_easy_cleanup(curl);
         return (tnic_errnoReturn) {
@@ -67,6 +70,7 @@ tnic_errnoReturn getTrackFromQuery(const char *query, struct coglink_client *cli
     free(searchQuery);
 
     if (status == COGLINK_FAILED) {
+        log_debug("[TNIC/Errno] Errno: tnic_SEARCH_FAILED, position: %d, at %s", __LINE__, __FILE__);
         return (tnic_errnoReturn) {
             .Err = tnic_SEARCH_FAILED,
             .additionalNumber = 0,
@@ -98,6 +102,7 @@ tnic_errnoReturn getTrackFromQuery(const char *query, struct coglink_client *cli
         
         case COGLINK_LOAD_TYPE_EMPTY:        
         case COGLINK_LOAD_TYPE_ERROR:
+            log_debug("[TNIC/Errno] Errno: tnic_SEARCH_FAILED, position: %d, at %s", __LINE__, __FILE__);
             coglink_free_load_tracks(response);
             free(response);
 
@@ -115,7 +120,10 @@ tnic_errnoReturn getTrackFromQuery(const char *query, struct coglink_client *cli
     };
 }
 
-void playTrack(tnic_application app, struct coglink_player *player, tnic_track *track) {
+void playTrack(tnic_application app, struct coglink_player *player, tnic_track *track,
+               u64snowflake guildId, u64snowflake channelId) {
+    coglink_join_voice_channel(app.client, app.bot, guildId, 
+                               channelId);
     struct coglink_update_player_params params = {
         .track = &(struct coglink_update_player_track_params) {
             .encoded = track->encodedTrack
@@ -138,13 +146,10 @@ void youtube(tnic_application app, const struct discord_interaction *event) {
         return;
     }
 
-    coglink_join_voice_channel(app.client, app.bot, event->guild_id, user->channel_id);
-
     tnic_errnoReturn getTrackErrno = getTrackFromQuery(event->data->options->array[0].value, app.client, player);
 
     if (getTrackErrno.Err == tnic_IS_NULL) {
-        switch (getTrackErrno.additionalNumber)
-        {
+        switch (getTrackErrno.additionalNumber) {
         case GET_TRACK_CURL_ERROR:
             tnic_sendErrorEmbed(app, event, "#e003x1", "Failed to process request. Report this issue to administrator");
             break;
@@ -170,10 +175,20 @@ void youtube(tnic_application app, const struct discord_interaction *event) {
 
     if (app.playlistController->playlist == NULL) {
         app.playlistController->playlist = playlist_init(track);
-        playTrack(app, player, track);
-    } else if (playlist_addTrack(app.playlistController->playlist, track)) {
-        log_debug("Playing");
-        playTrack(app, player, track);
+        playTrack(app, player, track, event->guild_id, user->channel_id);
+    } else {
+        tnic_errnoReturn errno = playlist_addTrack(app.playlistController->playlist, track);
+
+        if (errno.Err == tnic_IS_NULL) {
+            tnic_sendErrorEmbed(app, event, "#eAx1", 
+                                "Failed to process request. Report this issue to administrator");
+            return;
+        }
+
+        if (errno.additionalNumber == 1) {
+            log_debug("Playing");
+            playTrack(app, player, track, event->guild_id, user->channel_id);
+        }
     }
 
     struct discord_interaction_response interactionRespParams = {
@@ -187,8 +202,7 @@ void youtube(tnic_application app, const struct discord_interaction *event) {
     discord_create_interaction_response(app.bot, event->id, event->token, &interactionRespParams, NULL);
 }
 
-macro_testCommand()
-void commandTestDisconnect(tnic_application app, const struct discord_interaction *event) {
+void disconnect(tnic_application app, const struct discord_interaction *event) {
     struct coglink_player *player = coglink_get_player(app.client, event->guild_id);
 
     if (!player) {
@@ -222,7 +236,7 @@ void tnic_proccessApplicationCommand(tnic_application app, const struct discord_
     }
 
     if (strcmp(event->data->name, "disconnect") == 0) {
-        commandTestDisconnect(app, event);
+        disconnect(app, event);
         return;
     }
 }
@@ -244,13 +258,13 @@ void tnic_registerMusicCommands(struct discord *bot, const struct discord_ready 
         },
     };
 
-    struct discord_create_global_application_command commandTestDisconnect = {
+    struct discord_create_global_application_command disconnectCommand = {
         .name = "disconnect",
         .description = "Connection to voice channel test"
     };
 
     discord_create_global_application_command(bot, event->application->id, &youtubeCommand, NULL);
-    discord_create_global_application_command(bot, event->application->id, &commandTestDisconnect, NULL);
+    discord_create_global_application_command(bot, event->application->id, &disconnectCommand, NULL);
 }
 
 // Events
@@ -261,10 +275,9 @@ void tnic_cmusicProcessEvent(tnic_application app, struct coglink_client *c_clie
     if (trackEnd->reason == COGLINK_TRACK_END_REASON_FINISHED) {
         tnic_errnoReturn errno = playlist_changeTrack(app.playlistController->playlist, false, false);
 
-        if (errno.Err != tnic_OK)
+        if (errno.Err == tnic_PLAYLIST_END) {
             return;
-
-        
+        }
 
         tnic_track *track = (tnic_track*)errno.Ok;
 

@@ -54,12 +54,21 @@ void on_ready(struct discord *bot, const struct discord_ready *event) {
 }
 
 void on_interaction(struct discord *bot, const struct discord_interaction *event) {
-    /* if (!app.botReady) {
+    if (!app.botReady) {
         tnic_sendErrorEmbed(app, event, "#e001x1 coglink_not_ready", 
                             "Application not ready. Waiting for nodes to connect");
         return;
     }
- */
+
+#ifdef DEBUG
+    if (app.config->allowedBotAdmin != 0 && 
+        event->member->user->id != app.config->allowedBotAdmin) {
+        tnic_sendErrorEmbed(app, event, "#eDEB", 
+                            "You are not allowed to use bot");
+        return;
+    }
+#endif
+
     if (event->type == DISCORD_INTERACTION_APPLICATION_COMMAND) {
         tnic_proccessApplicationCommand(app, event);
         return;
@@ -154,6 +163,18 @@ enum tnic_errorTypes loadApplicationConfig(tnic_application app) {
         log_info("[TNiC] Loaded status from config: %s", app.config->botStatus);
     }
 
+#ifdef DEBUG
+    value = discord_config_get_field(app.bot, (char *[1]) { "admin_debug_id" }, 1);
+
+    if (value.start != NULL) {
+        app.config->allowedBotAdmin = strtoull(value.start, NULL, 10);
+        log_info("[TNiC] Loaded admin_debug_id from config: %llu", app.config->allowedBotAdmin);
+    } else {
+        app.config->allowedBotAdmin = 0;
+        log_info("[TNiC] admin_debug_id not set, commands won't be locked", app.config->allowedBotAdmin);
+    }
+#endif
+
     return tnic_OK;
 }
 
@@ -162,7 +183,7 @@ int main(void) {
     struct coglink_client *client;
     struct discord *bot;
 
-    puts("AT PROJECT Limited, 2021 - 2025; ATNiC-290120250759JST");
+    puts("AT PROJECT Limited, 2021 - 2025; ATNiC-319120250634JST");
     puts("Product licensed by GPLv3, file `LICENSE`");
     puts("This is a prototype version and should not be used in production environments");
     puts("by Vladislav 'ElCapitan' Nazarov");
@@ -227,15 +248,10 @@ int main(void) {
 
     app.client->bot_id = app.config->botId;
     app.client->events = &(struct coglink_events){
-        .on_ready = &on_coglink_ready
-    };
-    app.client->num_shards = "1";
-
-    // Connecting events
-    struct coglink_events events = {
+        .on_ready = &on_coglink_ready,
         .on_track_end = &on_coglink_track_end
     };
-    app.client->events = &events;
+    app.client->num_shards = "1";
 
     // Connecting nodes
     if (coglink_connect_nodes(app.client, app.bot, &nodes) == COGLINK_FAILED) {
