@@ -36,7 +36,7 @@ tnic_errnoReturn playlist_addTrack(tnic_playlist *playlist, tnic_track *track) {
 }
 
 void playlist_changeState(tnic_playlist *playlist, const enum tnic_playlistStates state) {
-
+    playlist->currentState = state;
 }
 
 void playlist_clearPlaylist(tnic_playlist *playlist) {
@@ -112,6 +112,7 @@ tnic_playlist* playlist_init(tnic_track *track) {
 
     playlist->currentTrack = track;
     playlist->tracks[0] = track;
+    playlist->isPaused = false;
     playlist->position = 0;
     playlist->size = 1;
 

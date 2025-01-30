@@ -18,6 +18,36 @@ tnic_application app = {
     .coglinkReady = false,
 };
 
+// Clean command
+void applicationClean(tnic_application app) {
+    discord_cleanup(app.bot);
+    ccord_shutdown_async();
+
+    if (!app.coglinkReady) {
+        free(app.client);
+    } else {
+        coglink_cleanup(app.client);
+    }
+
+    ccord_global_cleanup();
+
+    if (app.config->botStatus != NULL) {
+        free(app.config->botStatus);
+    }
+
+    if (app.config->botGameName != NULL) {
+        free(app.config->botGameName);
+    }
+
+    if (app.playlistController->playlist != NULL) {
+        playlist_clearPlaylist(app.playlistController->playlist);
+        free(app.playlistController->playlist);
+    }
+
+    free(app.playlistController);
+    free(app.config);
+}
+
 // Events
 void on_coglink_ready(struct coglink_client *client, struct coglink_node *node, 
                       struct coglink_ready *ready) {
@@ -26,6 +56,12 @@ void on_coglink_ready(struct coglink_client *client, struct coglink_node *node,
 }
 
 void on_ready(struct discord *bot, const struct discord_ready *event) {
+    if (!app.botReady) {
+        log_fatal("[TNiC] CogLink node wasn't connected");
+        applicationClean(app);
+        exit(-1);
+    }
+
     log_info("[TNiC] Bot ready");
 
     // Setting up bot's status
@@ -54,12 +90,6 @@ void on_ready(struct discord *bot, const struct discord_ready *event) {
 }
 
 void on_interaction(struct discord *bot, const struct discord_interaction *event) {
-    if (!app.botReady) {
-        tnic_sendErrorEmbed(app, event, "#e001x1 coglink_not_ready", 
-                            "Application not ready. Waiting for nodes to connect");
-        return;
-    }
-
 #ifdef DEBUG
     if (app.config->allowedBotAdmin != 0 && 
         event->member->user->id != app.config->allowedBotAdmin) {
@@ -78,35 +108,6 @@ void on_interaction(struct discord *bot, const struct discord_interaction *event
 void on_coglink_track_end(struct coglink_client *c_client, struct coglink_node *node, 
                           struct coglink_track_end *trackEnd) {
     tnic_cmusicProcessEvent(app, c_client, node, trackEnd);
-}
-
-void applicationClean(tnic_application app) {
-    discord_cleanup(app.bot);
-    ccord_shutdown_async();
-
-    if (!app.coglinkReady) {
-        free(app.client);
-    } else {
-        coglink_cleanup(app.client);
-    }
-
-    ccord_global_cleanup();
-
-    if (app.config->botStatus != NULL) {
-        free(app.config->botStatus);
-    }
-
-    if (app.config->botGameName != NULL) {
-        free(app.config->botGameName);
-    }
-
-    if (app.playlistController->playlist != NULL) {
-        playlist_clearPlaylist(app.playlistController->playlist);
-        free(app.playlistController->playlist);
-    }
-
-    free(app.playlistController);
-    free(app.config);
 }
 
 void on_sigint_sigabt(int signal) {

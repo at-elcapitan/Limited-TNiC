@@ -228,6 +228,82 @@ void disconnect(tnic_application app, const struct discord_interaction *event) {
     discord_create_interaction_response(app.bot, event->id, event->token, &interactionRespParams, NULL);
 }
 
+macro_testCommand()
+void testRepeat(tnic_application app, const struct discord_interaction *event) {
+    if (app.playlistController->playlist->currentState == PLAYLIST_NORMAL) {
+        app.playlistController->playlist->currentState = PLAYLIST_REPEAT_SINGLE_TRACK;
+
+        struct discord_interaction_response interactionRespParams = {
+            .type = DISCORD_INTERACTION_CHANNEL_MESSAGE_WITH_SOURCE,
+            .data = &(struct discord_interaction_callback_data) {
+                .content = "Repeating single track",
+                .flags = DISCORD_MESSAGE_EPHEMERAL
+            }
+        };
+
+        discord_create_interaction_response(app.bot, event->id, event->token, &interactionRespParams, NULL);
+        return;
+    }
+
+    app.playlistController->playlist->currentState = PLAYLIST_NORMAL;
+
+    struct discord_interaction_response interactionRespParams = {
+        .type = DISCORD_INTERACTION_CHANNEL_MESSAGE_WITH_SOURCE,
+        .data = &(struct discord_interaction_callback_data) {
+            .content = "Disabling repeat",
+            .flags = DISCORD_MESSAGE_EPHEMERAL
+        }
+    };
+
+    discord_create_interaction_response(app.bot, event->id, event->token, &interactionRespParams, NULL);
+}
+
+macro_testCommand()
+void testPause(const tnic_application app, const struct discord_interaction *event) {
+    struct coglink_player *player = coglink_get_player(app.client, event->guild_id);
+    if (!player) {
+        tnic_sendErrorEmbed(app, event, "#e001x2", "Can't create coglink player");
+        return;
+    }
+
+    if (app.playlistController->playlist->isPaused) {
+        struct coglink_update_player_params params = {
+            .paused = COGLINK_PAUSED_STATE_FALSE
+        };
+        app.playlistController->playlist->isPaused = false;
+
+        coglink_update_player(app.client, player, &params, NULL);
+
+        struct discord_interaction_response interactionRespParams = {
+            .type = DISCORD_INTERACTION_CHANNEL_MESSAGE_WITH_SOURCE,
+            .data = &(struct discord_interaction_callback_data) {
+                .content = "Unpausing",
+                .flags = DISCORD_MESSAGE_EPHEMERAL
+            }
+        };
+
+        discord_create_interaction_response(app.bot, event->id, event->token, &interactionRespParams, NULL);
+        return;
+    }
+
+    struct coglink_update_player_params params = {
+        .paused = COGLINK_PAUSED_STATE_TRUE
+    };
+    app.playlistController->playlist->isPaused = true;
+
+    coglink_update_player(app.client, player, &params, NULL);
+
+    struct discord_interaction_response interactionRespParams = {
+        .type = DISCORD_INTERACTION_CHANNEL_MESSAGE_WITH_SOURCE,
+        .data = &(struct discord_interaction_callback_data) {
+            .content = "Pausing",
+            .flags = DISCORD_MESSAGE_EPHEMERAL
+        }
+    };
+
+    discord_create_interaction_response(app.bot, event->id, event->token, &interactionRespParams, NULL);
+}
+
 // Public functions
 void tnic_proccessApplicationCommand(tnic_application app, const struct discord_interaction *event) {
     if (strcmp(event->data->name, "youtube") == 0) {
@@ -237,6 +313,16 @@ void tnic_proccessApplicationCommand(tnic_application app, const struct discord_
 
     if (strcmp(event->data->name, "disconnect") == 0) {
         disconnect(app, event);
+        return;
+    }
+
+    if (strcmp(event->data->name, "toggle_pause") == 0) {
+        testPause(app, event);
+        return;
+    }
+
+    if (strcmp(event->data->name, "toggle_repeat") == 0) {
+        testRepeat(app, event);
         return;
     }
 }
@@ -263,6 +349,18 @@ void tnic_registerMusicCommands(struct discord *bot, const struct discord_ready 
         .description = "Connection to voice channel test"
     };
 
+    struct discord_create_global_application_command pauseCommand = {
+        .name = "toggle_pause",
+        .description = "Toggle pause for current track"
+    };
+
+    struct discord_create_global_application_command repeatCommand = {
+        .name = "toggle_repeat",
+        .description = "Toggle pause for current track"
+    };
+
+    discord_create_global_application_command(bot, event->application->id, &pauseCommand, NULL);
+    discord_create_global_application_command(bot, event->application->id, &repeatCommand, NULL);
     discord_create_global_application_command(bot, event->application->id, &youtubeCommand, NULL);
     discord_create_global_application_command(bot, event->application->id, &disconnectCommand, NULL);
 }
@@ -276,6 +374,7 @@ void tnic_cmusicProcessEvent(tnic_application app, struct coglink_client *c_clie
         tnic_errnoReturn errno = playlist_changeTrack(app.playlistController->playlist, false, false);
 
         if (errno.Err == tnic_PLAYLIST_END) {
+            playlist_clearPlaylist(app.playlistController->playlist);
             return;
         }
 
