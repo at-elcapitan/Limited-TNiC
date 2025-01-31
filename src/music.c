@@ -1,9 +1,9 @@
 #include "music.h"
 
-#define GET_TRACK_CURL_ERROR        1
-#define GET_TRACK_ALLCATION_ERORR   2
-#define GET_TRACK_CURL_ESCAPE_ERROR 3
-
+#define GET_TRACK_CURL_ERROR          1
+#define GET_TRACK_ALLCATION_ERORR     2
+#define GET_TRACK_CURL_ESCAPE_ERROR   3
+#define MUSIC_TITLE_STRLEN          276
 // Private functions
 /**
  * @brief Retrieves a track from a given query using the Coglink library.
@@ -35,7 +35,7 @@ tnic_errnoReturn getTrackFromQuery(const char *query, struct coglink_client *cli
             .Ok = NULL
         };
     }
-
+    log_trace("%s", query);
     char *search = curl_easy_escape(curl, query, strlen(query));
     if (!search) {
         log_debug("[TNIC/Errno] Errno: tnic_IS_NULL 3, position: %d, at %s", __LINE__, __FILE__);
@@ -59,7 +59,11 @@ tnic_errnoReturn getTrackFromQuery(const char *query, struct coglink_client *cli
         };
     }
 
-    snprintf(searchQuery, strlen(search) + sizeof("ytsearch:") + 1, "ytsearch:%s", search);
+    if (strncmp(query, "http://", sizeof("http://") - 1) != 0 && strncmp(query, "https://", sizeof("https://") - 1) != 0) {
+      snprintf(searchQuery, strlen(search) + sizeof("ytsearch:") + 1, "ytsearch:%s", search);
+    } else {
+      strcpy(searchQuery, search);
+    }
 
     struct coglink_load_tracks *response = (struct coglink_load_tracks*)malloc(sizeof(struct coglink_load_tracks *));
 
@@ -133,6 +137,30 @@ void playTrack(tnic_application app, struct coglink_player *player, tnic_track *
     coglink_update_player(app.client, player, &params, NULL);
 }
 
+macro_testCommand()
+void testSendTrackInfo(tnic_application app, const struct discord_interaction *event, char title[256]) {
+    char *description = (char*)malloc(MUSIC_TITLE_STRLEN);
+    snprintf(description, MUSIC_TITLE_STRLEN, "Now playing: **%s**", title);
+
+    struct discord_embed embed = {
+        .color = 0xFF0000,
+        .description = description
+    };
+
+    struct discord_interaction_response interactionRespParams = {
+        .type = DISCORD_INTERACTION_CHANNEL_MESSAGE_WITH_SOURCE,
+        .data = &(struct discord_interaction_callback_data) {
+            .embeds = &(struct discord_embeds){
+                .size = 1,
+                .array = &embed,
+            }
+        }
+    };
+
+    discord_create_interaction_response(app.bot, event->id, event->token, &interactionRespParams, NULL);
+    free(description);
+}
+
 void youtube(tnic_application app, const struct discord_interaction *event) {
     struct coglink_player *player = coglink_create_player(app.client, event->guild_id);
     if (!player) {
@@ -175,20 +203,34 @@ void youtube(tnic_application app, const struct discord_interaction *event) {
 
     if (app.playlistController->playlist == NULL) {
         app.playlistController->playlist = playlist_init(track);
+
+        // NOT FOR RELEASE ---------------
+        app.playlistController->playlist->channelId = event->channel_id;
+        testSendTrackInfo(app, event, track->trackInfo->title);
+        // NOT FOR RELEASE ---------------
+
         playTrack(app, player, track, event->guild_id, user->channel_id);
-    } else {
-        tnic_errnoReturn errno = playlist_addTrack(app.playlistController->playlist, track);
+        return;
+    } 
 
-        if (errno.Err == tnic_IS_NULL) {
-            tnic_sendErrorEmbed(app, event, "#eAx1", 
-                                "Failed to process request. Report this issue to administrator");
-            return;
-        }
+    tnic_errnoReturn errno = playlist_addTrack(app.playlistController->playlist, track);
+    
+    // NOT FOR RELEASE ---------------
+    app.playlistController->playlist->channelId = event->channel_id; 
+    // NOT FOR RELEASE ---------------
 
-        if (errno.additionalNumber == 1) {
-            log_debug("Playing");
-            playTrack(app, player, track, event->guild_id, user->channel_id);
-        }
+    if (errno.Err == tnic_IS_NULL) {
+        tnic_sendErrorEmbed(app, event, "#eAx1", 
+                            "Failed to process request. Report this issue to administrator");
+        return;
+    }
+
+    if (errno.additionalNumber == 1) {
+        // NOT FOR RELEASE ---------------
+        testSendTrackInfo(app, event, track->trackInfo->title);
+        // NOT FOR RELEASE ---------------
+        playTrack(app, player, track, event->guild_id, user->channel_id);
+        return;
     }
 
     struct discord_interaction_response interactionRespParams = {
@@ -304,10 +346,63 @@ void testPause(const tnic_application app, const struct discord_interaction *eve
     discord_create_interaction_response(app.bot, event->id, event->token, &interactionRespParams, NULL);
 }
 
+macro_testCommand()
+void testnEXT(tnic_application app, const struct discord_interaction *event) {
+    tnic_errnoReturn errno = playlist_changeTrack(app.playlistController->playlist, false, false);
+
+    if (errno.Err == tnic_PLAYLIST_END) {
+        tnic_sendErrorEmbed(app, event, "the_end", "End of playlist");
+        coglink_destroy_player(app.client, coglink_get_player(app.client, event->guild_id));
+        coglink_remove_player(app.client, coglink_get_player(app.client, event->guild_id));
+        return;
+    }
+
+    if (app.playlistController->playlist->tracks == NULL) {
+        tnic_sendErrorEmbed(app, event, "#e005", "Not playing anything");
+        return;
+    }
+
+    tnic_track *track = (tnic_track*)errno.Ok;
+
+    struct coglink_update_player_params params = {
+        .track = &(struct coglink_update_player_track_params) {
+            .encoded = track->encodedTrack
+        }
+    };
+
+    char *description = (char*)malloc(MUSIC_TITLE_STRLEN);
+    snprintf(description, MUSIC_TITLE_STRLEN, "Now playing: **%s**", track->trackInfo->title);
+
+    struct discord_embed embed = {
+        .color = 0xFF0000,
+        .description = description
+    };
+
+    struct discord_interaction_response interactionRespParams = {
+        .type = DISCORD_INTERACTION_CHANNEL_MESSAGE_WITH_SOURCE,
+        .data = &(struct discord_interaction_callback_data) {
+            .embeds = &(struct discord_embeds){
+                .size = 1,
+                .array = &embed,
+            }
+        }
+    };
+
+    discord_create_interaction_response(app.bot, event->id, event->token, &interactionRespParams, NULL);
+    free(description);
+
+    coglink_update_player(app.client, coglink_get_player(app.client, event->guild_id), &params, NULL);
+}
+
 // Public functions
 void tnic_proccessApplicationCommand(tnic_application app, const struct discord_interaction *event) {
     if (strcmp(event->data->name, "youtube") == 0) {
         youtube(app, event);
+        return;
+    }
+
+    if (app.playlistController->playlist == NULL) {
+        tnic_sendErrorEmbed(app, event, "#e002a", "Bot is not connected to the voice channel");
         return;
     }
 
@@ -323,6 +418,11 @@ void tnic_proccessApplicationCommand(tnic_application app, const struct discord_
 
     if (strcmp(event->data->name, "toggle_repeat") == 0) {
         testRepeat(app, event);
+        return;
+    }
+
+    if (strcmp(event->data->name, "next") == 0) {
+        testnEXT(app, event);
         return;
     }
 }
@@ -359,6 +459,12 @@ void tnic_registerMusicCommands(struct discord *bot, const struct discord_ready 
         .description = "Toggle pause for current track"
     };
 
+    struct discord_create_global_application_command nextCommand = {
+        .name = "next",
+        .description = "Skip this track"
+    };
+
+    discord_create_global_application_command(bot, event->application->id, &nextCommand, NULL);
     discord_create_global_application_command(bot, event->application->id, &pauseCommand, NULL);
     discord_create_global_application_command(bot, event->application->id, &repeatCommand, NULL);
     discord_create_global_application_command(bot, event->application->id, &youtubeCommand, NULL);
@@ -385,6 +491,27 @@ void tnic_cmusicProcessEvent(tnic_application app, struct coglink_client *c_clie
                 .encoded = track->encodedTrack
             }
         };
+
+        if (app.playlistController->playlist->currentState != PLAYLIST_REPEAT_SINGLE_TRACK) {
+            char *description = (char*)malloc(MUSIC_TITLE_STRLEN);
+            snprintf(description, MUSIC_TITLE_STRLEN, "Now playing: **%s**", track->trackInfo->title);
+
+            struct discord_embed embed = {
+                .color = 0xFF0000,
+                .description = description
+            };
+
+            struct discord_create_message params = {
+                .flags = 0,
+                .embeds = &(struct discord_embeds){
+                    .size = 1,
+                    .array = &embed,
+                },
+            };
+
+            discord_create_message(app.bot, app.playlistController->playlist->channelId, &params, NULL);
+            free(description);
+        }
 
         coglink_update_player(app.client, coglink_get_player(app.client, trackEnd->guildId), &params, NULL);
     }

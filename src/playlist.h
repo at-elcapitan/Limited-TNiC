@@ -28,6 +28,8 @@ typedef struct {
     size_t size;
     uint32_t position;
 
+    u64snowflake channelId; // NOT FOR RELEASE
+
     tnic_track **tracks;
     tnic_track *currentTrack;
 } tnic_playlist;

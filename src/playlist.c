@@ -52,6 +52,7 @@ void playlist_clearPlaylist(tnic_playlist *playlist) {
     playlist->currentState = PLAYLIST_NORMAL;
 
     free(playlist->tracks);
+    playlist->tracks = NULL;
 }
 
 tnic_errnoReturn playlist_getTrack(tnic_playlist *playlist, const uint32_t position) {
@@ -110,6 +111,7 @@ tnic_playlist* playlist_init(tnic_track *track) {
     tnic_playlist *playlist = (tnic_playlist*)malloc(sizeof(tnic_playlist));
     playlist->tracks = malloc(sizeof(tnic_track*));
 
+    playlist->currentState = PLAYLIST_NORMAL;
     playlist->currentTrack = track;
     playlist->tracks[0] = track;
     playlist->isPaused = false;

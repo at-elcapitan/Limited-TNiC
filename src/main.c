@@ -184,7 +184,7 @@ int main(void) {
     struct coglink_client *client;
     struct discord *bot;
 
-    puts("AT PROJECT Limited, 2021 - 2025; ATNiC-319120250634JST");
+    puts("AT PROJECT Limited, 2021 - 2025; ATNiC-v0.0.1");
     puts("Product licensed by GPLv3, file `LICENSE`");
     puts("This is a prototype version and should not be used in production environments");
     puts("by Vladislav 'ElCapitan' Nazarov");
