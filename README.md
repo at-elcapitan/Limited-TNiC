@@ -111,6 +111,7 @@ Create config.json in `build` folder (or any another folder with bot's executabl
 | /youtube          | Play a YouTube track                               |
 | /disconnect       | Disconnect bot from voice channel                  |
 | /next             | Changes track to the nEXT in playlist              |
+| /seek             | Seeks current track                                |
 | /toggle_pause     | Toggles pause mode                                 |
 | /toggle_repeat    | Toggles repeat single track mode                   |
 
