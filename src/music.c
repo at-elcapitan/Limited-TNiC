@@ -359,6 +359,7 @@ void testnEXT(tnic_application app, const struct discord_interaction *event) {
     tnic_errnoReturn errno = playlist_changeTrack(app.playlistController->playlist, false, false);
 
     if (errno.Err == tnic_PLAYLIST_END) {
+        playlist_clearPlaylist(app.playlistController->playlist);
         tnic_sendErrorEmbed(app, event, "the_end", "End of playlist");
         coglink_destroy_player(app.client, coglink_get_player(app.client, event->guild_id));
         coglink_remove_player(app.client, coglink_get_player(app.client, event->guild_id));
