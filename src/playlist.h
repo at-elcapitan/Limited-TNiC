@@ -1,6 +1,7 @@
 #ifndef __TNIC_PLAYLIST_H
 #define __TNIC_PLAYLIST_H
 
+#include <time.h>
 #include <stdlib.h>
 #include <concord/discord.h>
 #include <coglink/lavalink.h>
@@ -11,6 +12,10 @@
 typedef struct {
     char *username;
     char *encodedTrack;
+
+    int playingTimeDelta;      // Time since last playing before pausing
+    int lastPlayStartUnixTime; // Timestamp since start playing or last unpausing
+
     struct coglink_track_info *trackInfo;
     struct coglink_load_tracks *response;
 } tnic_track;
@@ -43,5 +48,9 @@ tnic_errnoReturn playlist_addTrack(tnic_playlist *playlist, tnic_track *track);
 tnic_errnoReturn playlist_getTrack(tnic_playlist *playlist, const uint32_t position);
 tnic_errnoReturn playlist_changeTrack(tnic_playlist *playlist, const bool reverse, bool force);
 tnic_playlist* playlist_init(tnic_track *track);
+void playlist_updatePaused(tnic_playlist *playlist);
+void playlist_updateUnpaused(tnic_playlist *playlist);
+int playlist_currentTrackPosition(tnic_playlist *playlist);
+void playlist_updateSeek(tnic_playlist *playlist, int seekTime, bool reset);
 
 #endif

@@ -3,6 +3,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <concord/discord.h>
 #include <coglink/lavalink.h>
 

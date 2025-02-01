@@ -39,6 +39,39 @@ void playlist_changeState(tnic_playlist *playlist, const enum tnic_playlistState
     playlist->currentState = state;
 }
 
+void playlist_updatePaused(tnic_playlist *playlist) {
+    int currentTimestamp = time(NULL);
+    tnic_track *track = playlist->currentTrack;
+    track->playingTimeDelta += currentTimestamp - track->lastPlayStartUnixTime;
+}
+
+void playlist_updateSeek(tnic_playlist *playlist, int seekTime, bool reset) {
+    if (reset) {
+        playlist->currentTrack->playingTimeDelta = 0;
+        return;
+    }
+
+    playlist->currentTrack->playingTimeDelta += seekTime;
+
+    if (playlist->currentTrack->playingTimeDelta < 0) {
+        playlist->currentTrack->playingTimeDelta = 0;
+    }
+}
+
+void playlist_updateUnpaused(tnic_playlist *playlist) {
+    playlist->currentTrack->lastPlayStartUnixTime = time(NULL);
+}
+
+int playlist_currentTrackPosition(tnic_playlist *playlist) {
+    tnic_track *track = playlist->currentTrack;
+
+    if (playlist->isPaused) {
+        return track->playingTimeDelta;
+    }
+
+    return track->playingTimeDelta + (time(NULL) - track->lastPlayStartUnixTime);
+}
+
 void playlist_clearPlaylist(tnic_playlist *playlist) {
     for (int i = 0; i < playlist->size; i++) {
         coglink_free_load_tracks(playlist->tracks[i]->response);

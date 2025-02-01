@@ -84,6 +84,7 @@ tnic_errnoReturn getTrackFromQuery(const char *query, struct coglink_client *cli
 
     tnic_track *track = malloc(sizeof(tnic_track));
     track->response = response;
+    track->playingTimeDelta = 0;
 
     switch (response->type) {
         case COGLINK_LOAD_TYPE_TRACK:
@@ -125,14 +126,14 @@ tnic_errnoReturn getTrackFromQuery(const char *query, struct coglink_client *cli
 }
 
 void playTrack(tnic_application app, struct coglink_player *player, tnic_track *track,
-               u64snowflake guildId, u64snowflake channelId) {
-    coglink_join_voice_channel(app.client, app.bot, guildId, 
-                               channelId);
+               u64snowflake guildId) {
     struct coglink_update_player_params params = {
         .track = &(struct coglink_update_player_track_params) {
             .encoded = track->encodedTrack
         }
     };
+
+    track->lastPlayStartUnixTime = time(NULL);
 
     coglink_update_player(app.client, player, &params, NULL);
 }
@@ -202,14 +203,17 @@ void youtube(tnic_application app, const struct discord_interaction *event) {
     tnic_track *track = (tnic_track*)getTrackErrno.Ok;
 
     if (app.playlistController->playlist == NULL) {
+        coglink_join_voice_channel(app.client, app.bot, event->guild_id, 
+                                user->channel_id);
         app.playlistController->playlist = playlist_init(track);
+        app.playlistController->playlist->currentTrack->lastPlayStartUnixTime = time(NULL);
 
         // NOT FOR RELEASE ---------------
         app.playlistController->playlist->channelId = event->channel_id;
         testSendTrackInfo(app, event, track->trackInfo->title);
         // NOT FOR RELEASE ---------------
 
-        playTrack(app, player, track, event->guild_id, user->channel_id);
+        playTrack(app, player, track, event->guild_id);
         return;
     } 
 
@@ -229,7 +233,7 @@ void youtube(tnic_application app, const struct discord_interaction *event) {
         // NOT FOR RELEASE ---------------
         testSendTrackInfo(app, event, track->trackInfo->title);
         // NOT FOR RELEASE ---------------
-        playTrack(app, player, track, event->guild_id, user->channel_id);
+        playTrack(app, player, track, event->guild_id);
         return;
     }
 
@@ -315,6 +319,7 @@ void testPause(const tnic_application app, const struct discord_interaction *eve
         app.playlistController->playlist->isPaused = false;
 
         coglink_update_player(app.client, player, &params, NULL);
+        playlist_updateUnpaused(app.playlistController->playlist);
 
         struct discord_interaction_response interactionRespParams = {
             .type = DISCORD_INTERACTION_CHANNEL_MESSAGE_WITH_SOURCE,
@@ -342,6 +347,9 @@ void testPause(const tnic_application app, const struct discord_interaction *eve
             .flags = DISCORD_MESSAGE_EPHEMERAL
         }
     };
+
+    playlist_updatePaused(app.playlistController->playlist);
+    log_debug("Paused track position: %d", playlist_currentTrackPosition(app.playlistController->playlist));
 
     discord_create_interaction_response(app.bot, event->id, event->token, &interactionRespParams, NULL);
 }
@@ -394,6 +402,31 @@ void testnEXT(tnic_application app, const struct discord_interaction *event) {
     coglink_update_player(app.client, coglink_get_player(app.client, event->guild_id), &params, NULL);
 }
 
+void seek(tnic_application app, const struct discord_interaction *event) {
+    int seek = strtol(event->data->options->array[0].value, NULL, 10);
+
+    struct coglink_update_player_params params = {
+        .position = (playlist_currentTrackPosition(app.playlistController->playlist) + seek) * 1000
+    };
+
+    playlist_updateSeek(app.playlistController->playlist, seek, false);
+
+    log_debug("Seek seconds: %d", params.position);
+
+    coglink_update_player(app.client, coglink_get_player(app.client, event->guild_id),
+                          &params, NULL);
+
+    struct discord_interaction_response interactionRespParams = {
+        .type = DISCORD_INTERACTION_CHANNEL_MESSAGE_WITH_SOURCE,
+        .data = &(struct discord_interaction_callback_data) {
+            .content = "Seeking",
+            .flags = DISCORD_MESSAGE_EPHEMERAL
+        }
+    };
+
+    discord_create_interaction_response(app.bot, event->id, event->token, &interactionRespParams, NULL);
+}
+
 // Public functions
 void tnic_proccessApplicationCommand(tnic_application app, const struct discord_interaction *event) {
     if (strcmp(event->data->name, "youtube") == 0) {
@@ -425,6 +458,11 @@ void tnic_proccessApplicationCommand(tnic_application app, const struct discord_
         testnEXT(app, event);
         return;
     }
+
+    if (strcmp(event->data->name, "seek") == 0) {
+        seek(app, event);
+        return;
+    }
 }
 
 void tnic_registerMusicCommands(struct discord *bot, const struct discord_ready *event) {
@@ -441,6 +479,22 @@ void tnic_registerMusicCommands(struct discord *bot, const struct discord_ready 
         .options = &(struct discord_application_command_options){
             .size = 1,
             .array = &youtubeCommandOption,
+        },
+    };
+
+    struct discord_application_command_option seekCommandOption = {
+            .type = DISCORD_APPLICATION_OPTION_INTEGER,
+            .name = "seek",
+            .description = "Seconds to seek",
+            .required = true
+    };
+
+    struct discord_create_global_application_command seekCommand = {
+        .name = "seek",
+        .description = "Seek current track",
+        .options = &(struct discord_application_command_options){
+            .size = 1,
+            .array = &seekCommandOption,
         },
     };
 
@@ -465,6 +519,7 @@ void tnic_registerMusicCommands(struct discord *bot, const struct discord_ready 
     };
 
     discord_create_global_application_command(bot, event->application->id, &nextCommand, NULL);
+    discord_create_global_application_command(bot, event->application->id, &seekCommand, NULL);
     discord_create_global_application_command(bot, event->application->id, &pauseCommand, NULL);
     discord_create_global_application_command(bot, event->application->id, &repeatCommand, NULL);
     discord_create_global_application_command(bot, event->application->id, &youtubeCommand, NULL);
@@ -485,12 +540,6 @@ void tnic_cmusicProcessEvent(tnic_application app, struct coglink_client *c_clie
         }
 
         tnic_track *track = (tnic_track*)errno.Ok;
-
-        struct coglink_update_player_params params = {
-            .track = &(struct coglink_update_player_track_params) {
-                .encoded = track->encodedTrack
-            }
-        };
 
         if (app.playlistController->playlist->currentState != PLAYLIST_REPEAT_SINGLE_TRACK) {
             char *description = (char*)malloc(MUSIC_TITLE_STRLEN);
@@ -513,6 +562,6 @@ void tnic_cmusicProcessEvent(tnic_application app, struct coglink_client *c_clie
             free(description);
         }
 
-        coglink_update_player(app.client, coglink_get_player(app.client, trackEnd->guildId), &params, NULL);
+        playTrack(app, coglink_get_player(app.client, trackEnd->guildId), track, trackEnd->guildId);
     }
 }
