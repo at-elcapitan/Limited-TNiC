@@ -1,10 +1,8 @@
 #include "music.h"
 
-#define GET_TRACK_CURL_ERROR          1
-#define GET_TRACK_ALLCATION_ERORR     2
-#define GET_TRACK_CURL_ESCAPE_ERROR   3
-#define MUSIC_TITLE_STRLEN          276
-// Private functions
+#define GET_TRACK_CURL_ERROR            1
+#define GET_TRACK_ALLCATION_ERORR       2
+#define GET_TRACK_CURL_ESCAPE_ERROR     3
 /**
  * @brief Retrieves a track from a given query using the Coglink library.
  *
@@ -24,7 +22,7 @@
  * @note void* Ok have to be converted to tnic_track
  */
 tnic_errnoReturn getTrackFromQuery(const char *query, struct coglink_client *client,
-                                   struct coglink_player *player) {
+                                   struct coglink_player *player, char* username) {
     CURL *curl = curl_easy_init();
     if (!curl) {
         log_debug("[TNIC/Errno] Errno: tnic_IS_NULL 1, position: %d, at %s", __LINE__, __FILE__);
@@ -85,6 +83,7 @@ tnic_errnoReturn getTrackFromQuery(const char *query, struct coglink_client *cli
     tnic_track *track = malloc(sizeof(tnic_track));
     track->response = response;
     track->playingTimeDelta = 0;
+    track->username = username;
 
     switch (response->type) {
         case COGLINK_LOAD_TYPE_TRACK:
@@ -139,13 +138,42 @@ void playTrack(tnic_application app, struct coglink_player *player, tnic_track *
 }
 
 macro_testCommand()
-void testSendTrackInfo(tnic_application app, const struct discord_interaction *event, char title[256]) {
-    char *description = (char*)malloc(MUSIC_TITLE_STRLEN);
-    snprintf(description, MUSIC_TITLE_STRLEN, "Now playing: **%s**", title);
+void testSendTrackInfo(tnic_application app, const struct discord_interaction *event,
+                       tnic_track *track) {
+    uint32_t length = 690 + snprintf(NULL, 0, "%ld", track->trackInfo->length);
+    char *description = (char*)malloc(length);
+
+    int totalSecs = track->trackInfo->length / 1000;
+    int minutes = totalSecs / 60;
+    int seconds = totalSecs % 60;
+
+    snprintf(description, length, "Length: %d:%d\n\n> URL: [link](%s)\n> Ordered by: `%s`", 
+             minutes, seconds, track->trackInfo->uri, track->username);
+    
+    char footerText[80];
+    char loopState[14];
+
+    if (app.playlistController->playlist->currentState == PLAYLIST_NORMAL) {
+        strcpy(loopState, "turned off");
+    } else {
+        strcpy(loopState, "current track");
+    }
+
+    snprintf(footerText, 67, "Loop: %s\nPosition: %d of %ld\nVolume: %d%%", 
+             loopState, app.playlistController->playlist->position + 1,
+             app.playlistController->playlist->size, 100);
+
+    struct discord_embed_footer footer = {
+        .text = footerText,
+        .icon_url = NULL,
+        .proxy_icon_url = NULL
+    };
 
     struct discord_embed embed = {
-        .color = 0xFF0000,
-        .description = description
+        .color = 0xa31eff,
+        .title = track->trackInfo->title,
+        .description = description,
+        .footer = &footer
     };
 
     struct discord_interaction_response interactionRespParams = {
@@ -175,7 +203,8 @@ void youtube(tnic_application app, const struct discord_interaction *event) {
         return;
     }
 
-    tnic_errnoReturn getTrackErrno = getTrackFromQuery(event->data->options->array[0].value, app.client, player);
+    tnic_errnoReturn getTrackErrno = getTrackFromQuery(event->data->options->array[0].value, 
+                                                       app.client, player, event->member->user->username);
 
     if (getTrackErrno.Err == tnic_IS_NULL) {
         switch (getTrackErrno.additionalNumber) {
@@ -210,7 +239,7 @@ void youtube(tnic_application app, const struct discord_interaction *event) {
 
         // NOT FOR RELEASE ---------------
         app.playlistController->playlist->channelId = event->channel_id;
-        testSendTrackInfo(app, event, track->trackInfo->title);
+        testSendTrackInfo(app, event, track);
         // NOT FOR RELEASE ---------------
 
         playTrack(app, player, track, event->guild_id);
@@ -231,7 +260,7 @@ void youtube(tnic_application app, const struct discord_interaction *event) {
 
     if (errno.additionalNumber == 1) {
         // NOT FOR RELEASE ---------------
-        testSendTrackInfo(app, event, track->trackInfo->title);
+        testSendTrackInfo(app, event, track);
         // NOT FOR RELEASE ---------------
         playTrack(app, player, track, event->guild_id);
         return;
@@ -379,27 +408,7 @@ void testnEXT(tnic_application app, const struct discord_interaction *event) {
         }
     };
 
-    char *description = (char*)malloc(MUSIC_TITLE_STRLEN);
-    snprintf(description, MUSIC_TITLE_STRLEN, "Now playing: **%s**", track->trackInfo->title);
-
-    struct discord_embed embed = {
-        .color = 0xFF0000,
-        .description = description
-    };
-
-    struct discord_interaction_response interactionRespParams = {
-        .type = DISCORD_INTERACTION_CHANNEL_MESSAGE_WITH_SOURCE,
-        .data = &(struct discord_interaction_callback_data) {
-            .embeds = &(struct discord_embeds){
-                .size = 1,
-                .array = &embed,
-            }
-        }
-    };
-
-    discord_create_interaction_response(app.bot, event->id, event->token, &interactionRespParams, NULL);
-    free(description);
-
+    testSendTrackInfo(app, event, track);
     coglink_update_player(app.client, coglink_get_player(app.client, event->guild_id), &params, NULL);
 }
 
@@ -543,11 +552,15 @@ void tnic_cmusicProcessEvent(tnic_application app, struct coglink_client *c_clie
         tnic_track *track = (tnic_track*)errno.Ok;
 
         if (app.playlistController->playlist->currentState != PLAYLIST_REPEAT_SINGLE_TRACK) {
-            char *description = (char*)malloc(MUSIC_TITLE_STRLEN);
-            snprintf(description, MUSIC_TITLE_STRLEN, "Now playing: **%s**", track->trackInfo->title);
+            uint32_t length = 690 + snprintf(NULL, 0, "%ld", track->trackInfo->length);
+            char *description = (char*)malloc(length);
 
+            snprintf(description, length, "Length: %ld\n\n> URL: [link](%s)\n> Ordered by: `%s`", 
+                    track->trackInfo->length, track->trackInfo->uri, track->username);
+            
             struct discord_embed embed = {
-                .color = 0xFF0000,
+                .color = 0xa31eff,
+                .title = track->trackInfo->title,
                 .description = description
             };
 

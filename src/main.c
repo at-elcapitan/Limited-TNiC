@@ -181,7 +181,7 @@ enum tnic_errorTypes loadApplicationConfig(tnic_application app) {
 
 int main(void) {
     signal(SIGINT, &on_sigint_sigtrm);
-    signal(SIGTERM, &on_sigint_sigtrm);
+    // signal(SIGTERM, &on_sigint_sigtrm);
     struct coglink_client *client;
     struct discord *bot;
 

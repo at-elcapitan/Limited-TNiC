@@ -7,5 +7,6 @@
 
 void tnic_sendErrorEmbed(tnic_application app, const struct discord_interaction *event, 
                          char *errstring, char *message);
-
+void tnic_sendInfoEmbed(tnic_application app, const struct discord_interaction *event, 
+                        char *message);        
 #endif
