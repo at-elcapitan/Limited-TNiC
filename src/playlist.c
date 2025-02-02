@@ -81,6 +81,7 @@ void playlist_clearPlaylist(tnic_playlist *playlist) {
     for (int i = 0; i < playlist->size; i++) {
         coglink_free_load_tracks(playlist->tracks[i]->response);
         free(playlist->tracks[i]->response);
+        free(playlist->tracks[i]->username);
         free(playlist->tracks[i]);
     }
 
@@ -142,7 +143,13 @@ tnic_errnoReturn playlist_changeTrack(tnic_playlist *playlist, const bool revers
         playlist->position += 1;
     }
 
-    return playlist_getTrack(playlist, playlist->position);
+    tnic_errnoReturn errno = playlist_getTrack(playlist, playlist->position);
+
+    if (errno.Err == tnic_OK) {
+        playlist->currentTrack = playlist->tracks[playlist->position];
+    }
+
+    return errno;
 }
 
 tnic_playlist* playlist_init(tnic_track *track) {
@@ -153,7 +160,10 @@ tnic_playlist* playlist_init(tnic_track *track) {
     playlist->currentTrack = track;
     playlist->tracks[0] = track;
     playlist->isPaused = false;
+    playlist->channelId = 0;
+    playlist->messageId = 0;
     playlist->position = 0;
+    playlist->volume = 100;
     playlist->size = 1;
 
     return playlist;

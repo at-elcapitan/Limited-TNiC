@@ -30,10 +30,12 @@ typedef struct {
     bool isPaused;
     enum tnic_playlistStates currentState;
 
+    int volume;
     size_t size;
     uint32_t position;
 
-    u64snowflake channelId; // NOT FOR RELEASE
+    u64snowflake channelId;
+    u64snowflake messageId;
 
     tnic_track **tracks;
     tnic_track *currentTrack;
