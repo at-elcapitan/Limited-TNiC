@@ -46,15 +46,20 @@ void playlist_updatePaused(tnic_playlist *playlist) {
 }
 
 void playlist_updateSeek(tnic_playlist *playlist, int seekTime, bool reset) {
+    tnic_track *track = playlist->currentTrack;
+    int currTS = time(NULL);
+
     if (reset) {
-        playlist->currentTrack->playingTimeDelta = 0;
+        track->playingTimeDelta = 0;
+        track->lastPlayStartUnixTime = currTS;
         return;
     }
 
-    playlist->currentTrack->playingTimeDelta += seekTime;
+    track->playingTimeDelta += currTS - track->lastPlayStartUnixTime + seekTime;
+    track->lastPlayStartUnixTime = currTS;
 
     if (playlist->currentTrack->playingTimeDelta < 0) {
-        playlist->currentTrack->playingTimeDelta = 0;
+        track->playingTimeDelta = 0;
     }
 }
 

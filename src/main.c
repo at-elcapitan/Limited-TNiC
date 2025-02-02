@@ -110,7 +110,7 @@ void on_coglink_track_end(struct coglink_client *c_client, struct coglink_node *
     tnic_cmusicProcessEvent(app, c_client, node, trackEnd);
 }
 
-void on_sigint_sigabt(int signal) {
+void on_sigint_sigtrm(int signal) {
     log_info("[TNiC] Catched signal %d, cleaning application", signal);
     applicationClean(app);
     exit(0);
@@ -180,11 +180,12 @@ enum tnic_errorTypes loadApplicationConfig(tnic_application app) {
 }
 
 int main(void) {
-    signal(SIGINT, &on_sigint_sigabt);
+    signal(SIGINT, &on_sigint_sigtrm);
+    signal(SIGTERM, &on_sigint_sigtrm);
     struct coglink_client *client;
     struct discord *bot;
 
-    puts("AT PROJECT Limited, 2021 - 2025; ATNiC-v0.0.3");
+    puts("AT PROJECT Limited, 2021 - 2025; ATNiC-v0.0.4");
     puts("Product licensed by GPLv3, file `LICENSE`");
     puts("This is a prototype version and should not be used in production environments");
     puts("by Vladislav 'ElCapitan' Nazarov");
