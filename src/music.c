@@ -151,16 +151,20 @@ void testSendTrackInfo(tnic_application app, const struct discord_interaction *e
              minutes, seconds, track->trackInfo->uri, track->username);
     
     char footerText[80];
-    char loopState[14];
+
+    /* char loopState[14];
 
     if (app.playlistController->playlist->currentState == PLAYLIST_NORMAL) {
         strcpy(loopState, "turned off");
     } else {
         strcpy(loopState, "current track");
-    }
+    } */
 
-    snprintf(footerText, 67, "Loop: %s\nPosition: %d of %ld\nVolume: %d%%", 
+    /* snprintf(footerText, 67, "Loop: %s\nPosition: %d of %ld\nVolume: %d%%", 
              loopState, app.playlistController->playlist->position + 1,
+             app.playlistController->playlist->size, 100); */
+    snprintf(footerText, 67, "Position: %d of %ld\nVolume: %d%%", 
+             app.playlistController->playlist->position + 1,
              app.playlistController->playlist->size, 100);
 
     struct discord_embed_footer footer = {
@@ -551,17 +555,35 @@ void tnic_cmusicProcessEvent(tnic_application app, struct coglink_client *c_clie
 
         tnic_track *track = (tnic_track*)errno.Ok;
 
+        // NOT FOR RELEASE -----
         if (app.playlistController->playlist->currentState != PLAYLIST_REPEAT_SINGLE_TRACK) {
             uint32_t length = 690 + snprintf(NULL, 0, "%ld", track->trackInfo->length);
             char *description = (char*)malloc(length);
 
-            snprintf(description, length, "Length: %ld\n\n> URL: [link](%s)\n> Ordered by: `%s`", 
-                    track->trackInfo->length, track->trackInfo->uri, track->username);
+            int totalSecs = track->trackInfo->length / 1000;
+            int minutes = totalSecs / 60;
+            int seconds = totalSecs % 60;
+
+            snprintf(description, length, "Length: %d:%d\n\n> URL: [link](%s)\n> Ordered by: `%s`", 
+                    minutes, seconds, track->trackInfo->uri, track->username);
             
+            char footerText[80];
+            
+            snprintf(footerText, 67, "Position: %d of %ld\nVolume: %d%%", 
+                    app.playlistController->playlist->position + 1,
+                    app.playlistController->playlist->size, 100);
+
+            struct discord_embed_footer footer = {
+                .text = footerText,
+                .icon_url = NULL,
+                .proxy_icon_url = NULL
+            };
+
             struct discord_embed embed = {
                 .color = 0xa31eff,
                 .title = track->trackInfo->title,
-                .description = description
+                .description = description,
+                .footer = &footer
             };
 
             struct discord_create_message params = {
@@ -575,6 +597,7 @@ void tnic_cmusicProcessEvent(tnic_application app, struct coglink_client *c_clie
             discord_create_message(app.bot, app.playlistController->playlist->channelId, &params, NULL);
             free(description);
         }
+        // NOT FOR RELEASE -----
 
         playTrack(app, coglink_get_player(app.client, trackEnd->guildId), track, trackEnd->guildId);
     }
