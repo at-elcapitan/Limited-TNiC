@@ -181,11 +181,11 @@ enum tnic_errorTypes loadApplicationConfig(tnic_application app) {
 
 int main(void) {
     signal(SIGINT, &on_sigint_sigtrm);
-    // signal(SIGTERM, &on_sigint_sigtrm);
+    signal(SIGTERM, &on_sigint_sigtrm);
     struct coglink_client *client;
     struct discord *bot;
 
-    puts("AT PROJECT Limited, 2021 - 2025; ATNiC-v0.0.4");
+    puts("AT PROJECT Limited, 2021 - 2025; ATNiC-v0.0.5");
     puts("Product licensed by GPLv3, file `LICENSE`");
     puts("This is a prototype version and should not be used in production environments");
     puts("by Vladislav 'ElCapitan' Nazarov");
