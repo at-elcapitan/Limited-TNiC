@@ -16,7 +16,7 @@ Limited TNiC is a full rewrite of nEXT bot with saving functionality. TNiC stand
 
 Limited nEXT is one of the bots in the 'Limited' series, which includes:
 
-- [Limited TNiC](https://gitea.atproject.com.ua/elcapitan/Limited-TNiC) (this bot) replaced [Limited nEXT](https://github.com/at-elcapitan/Limited_Py)
+- [Limited TNiC](https://gitea.atproject.com.ua/elcapitan/Limited-TNiC) (this bot)
 - [Limited C/Link](https://github.com/at-elcapitan/Limited-C_Link)
 - [Limited jEXT](https://github.com/at-elcapitan/AT-Limited_jEXT)
 
