@@ -35,7 +35,7 @@ tnic_errnoReturn getTrackFromQuery(const char *query, struct coglink_client *cli
     }
 
     log_debug("Query loaded: %s by %s", query, username);
-    
+
     char *search = curl_easy_escape(curl, query, strlen(query));
     if (!search) {
         log_debug("[TNIC/Errno] Errno: tnic_IS_NULL 3, position: %d, at %s", __LINE__, __FILE__);
@@ -151,7 +151,19 @@ void updateMessage(tnic_application app, const u64snowflake channelId) {
     tnic_track *track = playlist->currentTrack;
 
     char *footerText = (char*)malloc(80);
+
+    if (!footerText) {
+        log_error("Unable to allocate memory for variable");
+        return;
+    }
+
     char *loopState = (char*)malloc(14);
+
+    if (!loopState) {
+        log_error("Unable to allocate memory for variable");
+        free(footerText);
+        return;
+    }
 
     switch (playlist->currentState) {
     case PLAYLIST_NORMAL:
@@ -206,14 +218,21 @@ void updateMessage(tnic_application app, const u64snowflake channelId) {
         .proxy_icon_url = NULL
     };
 
-    uint32_t length = 800 + snprintf(NULL, 0, "%ld", track->trackInfo->length);
+    uint32_t length = 840 + snprintf(NULL, 0, "%ld", track->trackInfo->length);
     char *description = (char*)malloc(length);
+
+    if (!description) {
+        log_error("Couldn't allocate memory for variable");
+        free(footerText);
+        free(loopState);
+        return;
+    }
 
     int totalSecs = track->trackInfo->length / 1000;
     int minutes = totalSecs / 60;
     int seconds = totalSecs % 60;
 
-    snprintf(description, length, "Length: %d:%d\n\n> URL: [link](%s)\n> Ordered by: `%s`", 
+    snprintf(description, length, "Length: %02d:%02d\n\n> URL: [link](%s)\n> Ordered by: `%s`", 
              minutes, seconds, track->trackInfo->uri, track->username);
 
     struct discord_embed embed = {
@@ -304,7 +323,7 @@ void youtube(tnic_application app, const struct discord_interaction *event) {
 
     if (app.playlistController->playlist == NULL) {
         coglink_join_voice_channel(app.client, app.bot, event->guild_id, 
-                                user->channel_id);
+                                   user->channel_id);
         app.playlistController->playlist = playlist_init(track);
         app.playlistController->playlist->currentTrack->lastPlayStartUnixTime = time(NULL);
 
