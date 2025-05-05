@@ -8,23 +8,23 @@
 #include "playlist.h"
 
 typedef struct {
-    u64snowflake botId;
-    char *botGameName;
-    char *botStatus;
+	u64snowflake botId;
+	char *botGameName;
+	char *botStatus;
 #ifdef DEBUG
-    u64snowflake allowedBotAdmin;
+	u64snowflake allowedBotAdmin;
 #endif
 } tnic_applicationConfig;
 
 typedef struct {
-    bool botReady;
-    bool coglinkReady;
+	bool botReady;
+	bool coglinkReady;
 
-    struct discord *bot;
-    struct coglink_client *client;
+	struct discord *bot;
+	struct coglink_client *client;
 
-    tnic_playlist_controller *playlistController;
-    tnic_applicationConfig *config;
+	tnic_playlist_controller *playlistController;
+	tnic_applicationConfig *config;
 } tnic_application;
 
 #endif
