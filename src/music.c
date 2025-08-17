@@ -1,4 +1,5 @@
 #include "music.h"
+#include <coglink/codecs.h>
 
 #define GET_TRACK_CURL_ERROR 1
 #define GET_TRACK_ALLCATION_ERORR 2
@@ -452,10 +453,11 @@ macro_testCommand() void testPause(const tnic_application app,
                                       &interactionRespParams, NULL);
 }
 
-macro_testCommand() void testnEXT(tnic_application app,
-                                  const struct discord_interaction *event) {
+macro_testCommand() void testChangeTrack(
+    tnic_application app, bool reverse,
+    const struct discord_interaction *event) {
   tnic_errnoReturn errno =
-      playlist_changeTrack(app.playlistController->playlist, false, true);
+      playlist_changeTrack(app.playlistController->playlist, reverse, true);
 
   if (errno.Err == tnic_PLAYLIST_END) {
     updateMessage(app, event->channel_id);
@@ -484,6 +486,8 @@ macro_testCommand() void testnEXT(tnic_application app,
 
   updateMessage(app, event->channel_id);
   tnic_sendInfoEmbed(app, event, "Processing...");
+
+  app.playlistController->playlist->trackEventChangeBlock = true;
   coglink_update_player(app.client,
                         coglink_get_player(app.client, event->guild_id),
                         &params, NULL);
@@ -545,7 +549,12 @@ void tnic_proccessApplicationCommand(tnic_application app,
   }
 
   if (strcmp(event->data->name, "next") == 0) {
-    testnEXT(app, event);
+    testChangeTrack(app, false, event);
+    return;
+  }
+
+  if (strcmp(event->data->name, "prev") == 0) {
+    testChangeTrack(app, true, event);
     return;
   }
 
@@ -601,8 +610,13 @@ void tnic_registerMusicCommands(struct discord *bot,
   struct discord_create_global_application_command nextCommand = {
       .name = "next", .description = "Skip this track"};
 
+  struct discord_create_global_application_command prevCommand = {
+      .name = "prev", .description = "Play previous track"};
+
   discord_create_global_application_command(bot, event->application->id,
                                             &nextCommand, NULL);
+  discord_create_global_application_command(bot, event->application->id,
+                                            &prevCommand, NULL);
   discord_create_global_application_command(bot, event->application->id,
                                             &seekCommand, NULL);
   discord_create_global_application_command(bot, event->application->id,
@@ -619,6 +633,12 @@ void tnic_registerMusicCommands(struct discord *bot,
 macro_testCommand() void tnic_cmusicProcessEvent(
     tnic_application app, struct coglink_client *c_client,
     struct coglink_node *node, struct coglink_track_end *trackEnd) {
+  if (trackEnd->reason == COGLINK_TRACK_END_REASON_FINISHED &&
+      app.playlistController->playlist->trackEventChangeBlock) {
+    app.playlistController->playlist->trackEventChangeBlock = false;
+    return;
+  }
+
   if (trackEnd->reason == COGLINK_TRACK_END_REASON_FINISHED) {
     tnic_errnoReturn errno =
         playlist_changeTrack(app.playlistController->playlist, false, false);

@@ -119,7 +119,7 @@ tnic_errnoReturn playlist_getTrack(tnic_playlist *playlist,
  * @return .Ok - always NULL
  */
 tnic_errnoReturn playlist_changeTrack(tnic_playlist *playlist,
-                                      const bool reverse, bool force) {
+                                      const bool reverse, const bool force) {
   enum tnic_playlistStates localStateCopy = playlist->currentState;
 
   // Checking if we want to force changing track (for repeating single track)
@@ -131,15 +131,25 @@ tnic_errnoReturn playlist_changeTrack(tnic_playlist *playlist,
   if (localStateCopy == PLAYLIST_REPEAT_SINGLE_TRACK)
     return (tnic_errnoReturn){.Err = tnic_OK, .Ok = playlist->currentTrack};
 
-  if (reverse && playlist->position == 1) {  // If we are getting previous track
-    playlist->position = playlist->size - 1; // and we are at the beginning
+  if (reverse && playlist->position == 0) { // If we are getting previous track
+                                            // and we are at the beginning
+    if (localStateCopy == PLAYLIST_LOOP_PLAYLIST) { // If state is LOOP_PLAYLIST
+      playlist->position =
+          playlist->size - 1; // Cheange track to the last in playlist
+    } else {                  // Else return error
+      log_debug("[TNIC/Errno] Errno: tnic_PLAYLIST_END, position: %d, at %s",
+                __LINE__, __FILE__);
+      playlist_clearPlaylist(playlist);
+      return (tnic_errnoReturn){.Err = tnic_PLAYLIST_END, .Ok = NULL};
+    }
   } else if (!reverse && playlist->position + 1 == playlist->size &&
              localStateCopy == PLAYLIST_LOOP_PLAYLIST) { // If we are at the end
                                                          // of the playlist
     playlist->position = 0; // and state is set to LOOP_PLAYLIST
   } else {
-    if (playlist->position + 1 ==
-        playlist->size) { // If we are at the end of the playlist
+    if (!reverse &&
+        playlist->position + 1 ==
+            playlist->size) { // If we are at the end of the playlist
       log_debug("[TNIC/Errno] Errno: tnic_PLAYLIST_END, position: %d, at %s",
                 __LINE__, __FILE__);
       playlist_clearPlaylist(playlist);
@@ -148,7 +158,8 @@ tnic_errnoReturn playlist_changeTrack(tnic_playlist *playlist,
 
     // We are not at the end, we are not repeating single track
     // so we can return next track
-    playlist->position += 1;
+    playlist->position =
+        (reverse) ? playlist->position - 1 : playlist->position + 1;
   }
 
   tnic_errnoReturn errno = playlist_getTrack(playlist, playlist->position);
@@ -165,6 +176,7 @@ tnic_playlist *playlist_init(tnic_track *track) {
   playlist->tracks = malloc(sizeof(tnic_track *));
 
   playlist->currentState = PLAYLIST_NORMAL;
+  playlist->trackEventChangeBlock = false;
   playlist->currentTrack = track;
   playlist->tracks[0] = track;
   playlist->isPaused = false;
