@@ -12,6 +12,7 @@
 typedef struct {
     char *username;
     char *encodedTrack;
+    int startingPosition;
 
     int playingTimeDelta;      // Time since last playing before pausing
     int lastPlayStartUnixTime; // Timestamp since start playing or last unpausing

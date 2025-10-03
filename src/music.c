@@ -1,5 +1,10 @@
 #include "music.h"
+#include "src/playlist.h"
 #include <coglink/codecs.h>
+#include <concord/discord.h>
+#include <concord/discord_codecs.h>
+#include <errno.h>
+#include <limits.h>
 
 #define GET_TRACK_CURL_ERROR 1
 #define GET_TRACK_ALLCATION_ERORR 2
@@ -23,7 +28,7 @@
  *
  * @note void* Ok have to be converted to tnic_track
  */
-tnic_errnoReturn getTrackFromQuery(const char *query,
+tnic_errnoReturn getTrackFromQuery(const char *query, int trackStartPos,
                                    struct coglink_client *client,
                                    struct coglink_player *player,
                                    char *username) {
@@ -85,6 +90,7 @@ tnic_errnoReturn getTrackFromQuery(const char *query,
 
   tnic_track *track = malloc(sizeof(tnic_track));
   track->response = response;
+  track->startingPosition = trackStartPos;
   track->playingTimeDelta = 0;
   track->username = (char *)malloc(strlen(username));
   strncpy(track->username, username, strlen(username) + 1);
@@ -124,16 +130,29 @@ tnic_errnoReturn getTrackFromQuery(const char *query,
 
 void playTrack(tnic_application app, struct coglink_player *player,
                tnic_track *track, u64snowflake guildId) {
+
+  log_debug("Track position %d", track->startingPosition);
   struct coglink_update_player_params params = {
       .track =
           &(struct coglink_update_player_track_params){
               .encoded = track->encodedTrack,
           },
-      .volume = app.playlistController->playlist->volume};
+      .volume = app.playlistController->playlist->volume,
+  };
 
   track->lastPlayStartUnixTime = time(NULL);
+  track->playingTimeDelta += track->startingPosition;
 
   coglink_update_player(app.client, player, &params, NULL);
+
+  if (track->startingPosition == 0) {
+    return;
+  }
+
+  struct coglink_update_player_params seekParams = {
+      .position = track->startingPosition * 1000};
+
+  coglink_update_player(app.client, player, &seekParams, NULL);
 }
 
 void updateMessage(tnic_application app, const u64snowflake channelId) {
@@ -286,9 +305,31 @@ void youtube(tnic_application app, const struct discord_interaction *event) {
     return;
   }
 
+  int startingPos;
+
+  if (event->data->options->size == 2) {
+    char *endptr;
+    errno = 0;
+
+    startingPos = strtol(event->data->options->array[1].value, &endptr, 10);
+    log_debug("Starting pos: %d, errno: %d, endptr: %s, entry: %s", startingPos,
+              errno, endptr, event->data->options->array[1].value);
+
+    if (errno == ERANGE || startingPos > INT_MAX || startingPos < INT_MIN) {
+      log_warn("Startpos out of the int range");
+      startingPos = 0;
+    }
+
+    if (strcmp(endptr, ".0") != 0) {
+      log_warn("Cannot convert input startpos to int");
+      startingPos = 0;
+    }
+  } else
+    startingPos = 0;
+
   tnic_errnoReturn getTrackErrno =
-      getTrackFromQuery(event->data->options->array[0].value, app.client,
-                        player, event->member->user->username);
+      getTrackFromQuery(event->data->options->array[0].value, startingPos,
+                        app.client, player, event->member->user->username);
 
   if (getTrackErrno.Err == tnic_IS_NULL) {
     switch (getTrackErrno.additionalNumber) {
@@ -335,18 +376,18 @@ void youtube(tnic_application app, const struct discord_interaction *event) {
     return;
   }
 
-  tnic_errnoReturn errno =
+  tnic_errnoReturn errnol =
       playlist_addTrack(app.playlistController->playlist, track);
   updateMessage(app, event->channel_id);
 
-  if (errno.Err == tnic_IS_NULL) {
+  if (errnol.Err == tnic_IS_NULL) {
     tnic_sendErrorEmbed(
         app, event, "#eAx1",
         "Failed to process request. Report this issue to administrator");
     return;
   }
 
-  if (errno.additionalNumber == 1) {
+  if (errnol.additionalNumber == 1) {
     playTrack(app, player, track, event->guild_id);
   }
 
@@ -456,10 +497,10 @@ macro_testCommand() void testPause(const tnic_application app,
 macro_testCommand() void testChangeTrack(
     tnic_application app, bool reverse,
     const struct discord_interaction *event) {
-  tnic_errnoReturn errno =
+  tnic_errnoReturn errnol =
       playlist_changeTrack(app.playlistController->playlist, reverse, true);
 
-  if (errno.Err == tnic_PLAYLIST_END) {
+  if (errnol.Err == tnic_PLAYLIST_END) {
     updateMessage(app, event->channel_id);
     playlist_clearPlaylist(app.playlistController->playlist);
     tnic_sendErrorEmbed(app, event, "the_end", "End of playlist");
@@ -478,19 +519,17 @@ macro_testCommand() void testChangeTrack(
     return;
   }
 
-  tnic_track *track = (tnic_track *)errno.Ok;
+  struct coglink_player *c_player =
+      coglink_get_player(app.client, event->guild_id);
 
-  struct coglink_update_player_params params = {
-      .track = &(struct coglink_update_player_track_params){
-          .encoded = track->encodedTrack}};
+  tnic_track *track = (tnic_track *)errnol.Ok;
+
+  playTrack(app, c_player, track, event->guild_id);
 
   updateMessage(app, event->channel_id);
   tnic_sendInfoEmbed(app, event, "Processing...");
 
   app.playlistController->playlist->trackEventChangeBlock = true;
-  coglink_update_player(app.client,
-                        coglink_get_player(app.client, event->guild_id),
-                        &params, NULL);
 }
 
 void seek(tnic_application app, const struct discord_interaction *event) {
@@ -566,20 +605,24 @@ void tnic_proccessApplicationCommand(tnic_application app,
 
 void tnic_registerMusicCommands(struct discord *bot,
                                 const struct discord_ready *event) {
-  struct discord_application_command_option youtubeCommandOption = {
-      .type = DISCORD_APPLICATION_OPTION_STRING,
-      .name = "query",
-      .description = "Your youtube query",
-      .required = true};
+  struct discord_application_command_option youtubeCommandOption[2] = {
+      (struct discord_application_command_option){
+          .type = DISCORD_APPLICATION_OPTION_STRING,
+          .name = "query",
+          .description = "Your youtube query",
+          .required = true},
+      (struct discord_application_command_option){
+          .type = DISCORD_APPLICATION_OPTION_NUMBER,
+          .name = "starting_position",
+          .description = "Starting position of playing song (sec)",
+          .required = false}};
 
   struct discord_create_global_application_command youtubeCommand = {
       .name = "youtube",
       .description = "Play youtube music",
       .options =
           &(struct discord_application_command_options){
-              .size = 1,
-              .array = &youtubeCommandOption,
-          },
+              .size = 2, .array = youtubeCommandOption},
   };
 
   struct discord_application_command_option seekCommandOption = {
@@ -640,16 +683,16 @@ macro_testCommand() void tnic_cmusicProcessEvent(
   }
 
   if (trackEnd->reason == COGLINK_TRACK_END_REASON_FINISHED) {
-    tnic_errnoReturn errno =
+    tnic_errnoReturn errnol =
         playlist_changeTrack(app.playlistController->playlist, false, false);
 
-    if (errno.Err == tnic_PLAYLIST_END) {
+    if (errnol.Err == tnic_PLAYLIST_END) {
       playlist_clearPlaylist(app.playlistController->playlist);
       updateMessage(app, 0);
       return;
     }
 
-    tnic_track *track = (tnic_track *)errno.Ok;
+    tnic_track *track = (tnic_track *)errnol.Ok;
     updateMessage(app, 0);
 
     playTrack(app, coglink_get_player(app.client, trackEnd->guildId), track,
