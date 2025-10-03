@@ -9,8 +9,8 @@
 Limited TNiC is a full rewrite of nEXT bot with saving functionality. TNiC stands for "The nEXT is C". TNiC is fully compatible with Limited nEXT PostgreSQL DB, so you don't want to replace it.
 
 > [!WARNING]  
-> ### TNiC Alpha
-> Bot is in the alpha stage, so it has a small part of nEXT functionality.
+> ### TNiC Beta
+> Bot is in the beta stage, so it has a small part of nEXT functionality.
 
 ## About
 
